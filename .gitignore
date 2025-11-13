@@ -1,0 +1,25 @@
+# Zig build artifacts
+zig-cache/
+zig-out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+*.o
+*.a
+*.so
+*.exe
+
+# Local testing
+test_output/
+CHANGELOG.md.test
+.zig-cache
