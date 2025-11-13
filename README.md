@@ -1,6 +1,6 @@
 # Changelog Generator
 
-A fast, efficient CLI tool written in Zig to automatically generate changelogs from GitHub tags, pull requests, and issues.
+A fast, efficient, native CLI tool to automatically generate changelogs from GitHub tags, pull requests, and issues. Written in Zig
 
 ## Features
 
