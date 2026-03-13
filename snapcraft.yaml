@@ -1,6 +1,6 @@
 name: changelog-generator
 base: core22
-version: 0.1.0
+version: 0.1.1
 title: Argiope
 summary: A fast, efficient, native CLI tool to automatically generate changelogs from GitHub tags, pull requests, and issue
 license: MIT
