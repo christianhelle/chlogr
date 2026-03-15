@@ -351,7 +351,7 @@ fn testCategorization() !void {
                 {
                     try std.testing.expect(std.mem.eql(u8, section.name, "Bug Fixes"));
                 } else {
-                    try std.testing.expect(std.mem.eql(u8, section.name, "Other"));
+                    try std.testing.expect(std.mem.eql(u8, section.name, "Merged Pull Requests"));
                 }
             }
         }

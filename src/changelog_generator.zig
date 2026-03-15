@@ -61,7 +61,7 @@ pub const ChangelogGenerator = struct {
                 return "Bug Fixes";
             }
         }
-        return "Other";
+        return "Merged Pull Requests";
     }
 
     fn compareDates(date1: []const u8, date2: []const u8) i32 {
