@@ -368,6 +368,8 @@ fn testCategorization() !void {
                     std.mem.indexOf(u8, entry.title, "fix") != null)
                 {
                     try std.testing.expect(std.mem.eql(u8, section.name, "Bug Fixes"));
+                } else {
+                    try std.testing.expect(std.mem.eql(u8, section.name, "Merged Pull Requests"));
                 }
             }
         }
