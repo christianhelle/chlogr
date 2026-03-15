@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
-$repo = "christianhelle/changelog-generator"
-$artifact = "changelog-generator-windows-x86_64.zip"
+$repo = "christianhelle/chlogr"
+$artifact = "chlogr-windows-x86_64.zip"
 $installDir = "$env:USERPROFILE\.local\bin"
 
 Write-Host "Fetching latest release..."
@@ -31,4 +31,4 @@ if ($userPath -notlike "*$installDir*") {
     Write-Host "Added $installDir to user PATH (restart your terminal to use)"
 }
 
-Write-Host "changelog-generator installed to $installDir\changelog-generator.exe"
+Write-Host "chlogr installed to $installDir\chlogr.exe"

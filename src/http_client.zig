@@ -20,7 +20,7 @@ pub const HttpClient = struct {
         const auth_header = try std.fmt.allocPrint(self.allocator, "Authorization: token {s}", .{self.token});
         defer self.allocator.free(auth_header);
 
-        const user_agent = "User-Agent: changelog-generator/0.1.0";
+        const user_agent = "User-Agent: chlogr/0.1.0";
 
         const args = [_][]const u8{
             "curl",

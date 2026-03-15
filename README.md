@@ -25,7 +25,7 @@ zig build
 ### Basic Usage
 
 ```bash
-./zig-out/bin/changelog-generator \
+./zig-out/bin/chlogr \
   --owner github \
   --repo cli \
   --output CHANGELOG.md
@@ -34,7 +34,7 @@ zig build
 ### With Token
 
 ```bash
-./zig-out/bin/changelog-generator \
+./zig-out/bin/chlogr \
   --owner github \
   --repo cli \
   --token ghp_xxxxxxxxxxxx \

@@ -69,7 +69,7 @@ pub const CliParser = struct {
         const help_text =
             \\GitHub Changelog Generator v0.1.0
             \\
-            \\Usage: changelog-generator --owner <owner> --repo <repo> [options]
+            \\Usage: chlogr --owner <owner> --repo <repo> [options]
             \\
             \\Required:
             \\  --owner <name>           GitHub organization or username
@@ -84,8 +84,8 @@ pub const CliParser = struct {
             \\  --help, -h               Show this help message
             \\
             \\Examples:
-            \\  changelog-generator --owner github --repo cli
-            \\  changelog-generator --owner github --repo cli --token ghp_xxxx --output HISTORY.md
+            \\  chlogr --owner github --repo cli
+            \\  chlogr --owner github --repo cli --token ghp_xxxx --output HISTORY.md
             \\
         ;
         std.debug.print("{s}", .{help_text});

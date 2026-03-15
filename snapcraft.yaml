@@ -1,4 +1,4 @@
-name: changelog-generator
+name: chlogr
 base: core22
 version: 0.1.1
 title: Argiope
@@ -34,8 +34,8 @@ grade: stable
 confinement: strict
 
 apps:
-  changelog-generator:
-    command: bin/changelog-generator
+  chlogr:
+    command: bin/chlogr
     plugs:
       - home
       - network
@@ -58,4 +58,4 @@ parts:
       export PATH="$SNAPCRAFT_STAGE/zig:$PATH"
       zig build -Doptimize=ReleaseFast
       mkdir -p $SNAPCRAFT_PART_INSTALL/bin
-      cp zig-out/bin/changelog-generator $SNAPCRAFT_PART_INSTALL/bin/
+      cp zig-out/bin/chlogr $SNAPCRAFT_PART_INSTALL/bin/

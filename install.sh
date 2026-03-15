@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="christianhelle/changelog-generator"
+REPO="christianhelle/chlogr"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 tmp_dir=""
 
@@ -41,7 +41,7 @@ main() {
   local platform artifact_name url
 
   platform="$(detect_platform)"
-  artifact_name="changelog-generator-${platform}.tar.gz"
+  artifact_name="chlogr-${platform}.tar.gz"
 
   echo "Detecting platform: ${platform}"
 
@@ -64,9 +64,9 @@ main() {
   echo "Installing to ${INSTALL_DIR}..."
   tar xzf "${tmp_dir}/${artifact_name}" -C "$tmp_dir"
   install -d "$INSTALL_DIR"
-  install -m 755 "${tmp_dir}/changelog-generator" "$INSTALL_DIR/changelog-generator"
+  install -m 755 "${tmp_dir}/chlogr" "$INSTALL_DIR/chlogr"
 
-  echo "changelog-generator installed to ${INSTALL_DIR}/changelog-generator"
+  echo "chlogr installed to ${INSTALL_DIR}/chlogr"
 }
 
 main

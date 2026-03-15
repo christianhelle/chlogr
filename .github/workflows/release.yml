@@ -37,21 +37,21 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: x86_64-linux
-            os: ubuntu-latest
-            artifact: changelog-generator-linux-x86_64
-          - target: aarch64-linux
-            os: ubuntu-latest
-            artifact: changelog-generator-linux-aarch64
-          - target: x86_64-macos
-            os: macos-latest
-            artifact: changelog-generator-macos-x86_64
-          - target: aarch64-macos
-            os: macos-latest
-            artifact: changelog-generator-macos-aarch64
-          - target: x86_64-windows
-            os: windows-latest
-            artifact: changelog-generator-windows-x86_64
+            - target: x86_64-linux
+              os: ubuntu-latest
+              artifact: chlogr-linux-x86_64
+            - target: aarch64-linux
+              os: ubuntu-latest
+              artifact: chlogr-linux-aarch64
+            - target: x86_64-macos
+              os: macos-latest
+              artifact: chlogr-macos-x86_64
+            - target: aarch64-macos
+              os: macos-latest
+              artifact: chlogr-macos-aarch64
+            - target: x86_64-windows
+              os: windows-latest
+              artifact: chlogr-windows-x86_64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -67,11 +67,11 @@ jobs:
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
-        run: tar czf ${{ matrix.artifact }}.tar.gz -C zig-out/bin changelog-generator
+        run: tar czf ${{ matrix.artifact }}.tar.gz -C zig-out/bin chlogr
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path zig-out\bin\changelog-generator.exe -DestinationPath ${{ matrix.artifact }}.zip
+        run: Compress-Archive -Path zig-out\bin\chlogr.exe -DestinationPath ${{ matrix.artifact }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
