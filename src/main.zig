@@ -75,11 +75,11 @@ pub fn main() !void {
     // Generate changelog
     var gen = changelog_generator.ChangelogGenerator.init(allocator, parsed_args.exclude_labels);
     const changelog = try gen.generate(releases, prs);
-    defer gen.deinit(changelog);
+    defer gen.deinitChangelog(changelog);
 
     // Format to Markdown
     var formatter = markdown_formatter.MarkdownFormatter.init(allocator);
-    const markdown = try formatter.format(changelog);
+    const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
     defer formatter.deinit(markdown);
 
     // Write to file
@@ -87,4 +87,3 @@ pub fn main() !void {
 
     std.debug.print("Changelog written to {s}\n", .{parsed_args.output});
 }
-

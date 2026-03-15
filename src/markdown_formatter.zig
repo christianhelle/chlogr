@@ -10,24 +10,64 @@ pub const MarkdownFormatter = struct {
         };
     }
 
-    /// Format changelog releases to Markdown string
+    /// Format changelog releases to Markdown string (legacy version for backward compat)
     pub fn format(self: MarkdownFormatter, releases: []changelog_generator.ChangelogRelease) ![]u8 {
-        // Calculate approximate capacity needed - count all items to append
-        var total_items: usize = 1; // header
-        for (releases) |release| {
-            total_items += 1; // release header
-            for (release.sections) |section| {
-                total_items += 1; // section header
-                total_items += section.entries.len; // entries
-                total_items += 1; // blank line
+        return self.formatWithUnreleased(releases, null);
+    }
+
+    /// Format changelog releases and unreleased changes to Markdown string
+    pub fn formatWithUnreleased(
+        self: MarkdownFormatter,
+        releases: []changelog_generator.ChangelogRelease,
+        unreleased: ?changelog_generator.UnreleasedChanges,
+    ) ![]u8 {
+        var total_items: usize = 1;
+        if (unreleased) |un| {
+            total_items += 1;
+            for (un.sections) |section| {
+                total_items += 1;
+                total_items += section.entries.len;
+                total_items += 1;
             }
-            total_items += 1; // blank line between releases
+            total_items += 1;
+        }
+        for (releases) |release| {
+            total_items += 1;
+            for (release.sections) |section| {
+                total_items += 1;
+                total_items += section.entries.len;
+                total_items += 1;
+            }
+            total_items += 1;
         }
 
         var parts = try std.ArrayList([]u8).initCapacity(self.allocator, total_items + 20);
         defer parts.deinit(self.allocator);
 
         try parts.append(self.allocator, try self.allocator.dupe(u8, "# Changelog\n\n"));
+
+        if (unreleased) |un| {
+            try parts.append(self.allocator, try self.allocator.dupe(u8, "## [Unreleased Changes]\n\n"));
+
+            for (un.sections) |section| {
+                const section_header = try std.fmt.allocPrint(self.allocator, "### {s}\n", .{section.name});
+                try parts.append(self.allocator, section_header);
+
+                for (section.entries) |entry| {
+                    const entry_line = try std.fmt.allocPrint(self.allocator, "- {s} ([#{d}]({s})) (@{s})\n", .{
+                        entry.title,
+                        entry.number,
+                        entry.url,
+                        entry.author,
+                    });
+                    try parts.append(self.allocator, entry_line);
+                }
+
+                try parts.append(self.allocator, try self.allocator.dupe(u8, "\n"));
+            }
+
+            try parts.append(self.allocator, try self.allocator.dupe(u8, "\n"));
+        }
 
         for (releases) |release| {
             const header = try std.fmt.allocPrint(self.allocator, "## [{s}](https://github.com/owner/repo/releases/tag/{s}) - {s}\n\n", .{

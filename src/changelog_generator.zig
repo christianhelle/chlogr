@@ -19,6 +19,15 @@ pub const ChangelogRelease = struct {
     sections: []ChangelogSection,
 };
 
+pub const UnreleasedChanges = struct {
+    sections: []ChangelogSection,
+};
+
+pub const Changelog = struct {
+    releases: []ChangelogRelease,
+    unreleased: ?UnreleasedChanges,
+};
+
 pub const ChangelogGenerator = struct {
     allocator: std.mem.Allocator,
     exclude_labels: ?[]const u8 = null,
@@ -52,7 +61,36 @@ pub const ChangelogGenerator = struct {
                 return "Bug Fixes";
             }
         }
-        return "Other";
+        return "Merged Pull Requests";
+    }
+
+    fn compareDates(date1: []const u8, date2: []const u8) i32 {
+        const d1 = parseDateToSlice(date1);
+        const d2 = parseDateToSlice(date2);
+        if (d1.len == 0 or d2.len == 0) return 0;
+        return switch (std.mem.order(u8, d1, d2)) {
+            .lt => -1,
+            .eq => 0,
+            .gt => 1,
+        };
+    }
+
+    fn parseDateToSlice(date_str: []const u8) []const u8 {
+        for (date_str, 0..) |c, i| {
+            if (c == 'T') {
+                return date_str[0..i];
+            }
+        }
+        return date_str;
+    }
+
+    fn isAfter(date_to_check: []const u8, reference_date: []const u8) bool {
+        if (reference_date.len == 0) return true;
+        return compareDates(date_to_check, reference_date) > 0;
+    }
+
+    fn isBefore(date_to_check: []const u8, reference_date: []const u8) bool {
+        return compareDates(date_to_check, reference_date) < 0;
     }
 
     /// Generate changelog from releases and PRs
@@ -60,8 +98,13 @@ pub const ChangelogGenerator = struct {
         self: ChangelogGenerator,
         releases: []models.Release,
         prs: []models.PullRequest,
-    ) ![]ChangelogRelease {
+    ) !Changelog {
         var result = try std.ArrayList(ChangelogRelease).initCapacity(self.allocator, releases.len);
+
+        var last_release_date: []const u8 = "";
+        if (releases.len > 0) {
+            last_release_date = releases[0].published_at;
+        }
 
         for (releases) |release| {
             var sections_map = std.StringHashMap(std.ArrayList(ChangelogEntry)).init(self.allocator);
@@ -73,9 +116,13 @@ pub const ChangelogGenerator = struct {
                 sections_map.deinit();
             }
 
-            // Group PRs by category
             for (prs) |pr| {
                 if (self.shouldExclude(pr.labels)) continue;
+                if (pr.merged_at) |merged_at| {
+                    if (!isBefore(merged_at, release.published_at)) continue;
+                } else {
+                    continue;
+                }
 
                 const category = self.categorizeEntry(pr.labels);
 
@@ -95,7 +142,6 @@ pub const ChangelogGenerator = struct {
                 try section_list.value_ptr.append(self.allocator, entry);
             }
 
-            // Convert sections map to array
             var sections_array = try std.ArrayList(ChangelogSection).initCapacity(self.allocator, sections_map.count());
 
             var it = sections_map.iterator();
@@ -114,12 +160,87 @@ pub const ChangelogGenerator = struct {
             };
 
             result.appendAssumeCapacity(release_entry);
+
+            if (compareDates(release.published_at, last_release_date) > 0) {
+                last_release_date = release.published_at;
+            }
         }
 
-        return result.toOwnedSlice(self.allocator);
+        var unreleased_sections_map = std.StringHashMap(std.ArrayList(ChangelogEntry)).init(self.allocator);
+        defer {
+            var it = unreleased_sections_map.iterator();
+            while (it.next()) |entry| {
+                entry.value_ptr.deinit(self.allocator);
+            }
+            unreleased_sections_map.deinit();
+        }
+
+        var has_unreleased = false;
+        for (prs) |pr| {
+            if (self.shouldExclude(pr.labels)) continue;
+            if (pr.merged_at) |merged_at| {
+                if (!isAfter(merged_at, last_release_date)) continue;
+            } else {
+                continue;
+            }
+
+            has_unreleased = true;
+            const category = self.categorizeEntry(pr.labels);
+
+            var section_list = unreleased_sections_map.getOrPut(category) catch continue;
+            if (!section_list.found_existing) {
+                const arr = try std.ArrayList(ChangelogEntry).initCapacity(self.allocator, prs.len);
+                section_list.value_ptr.* = arr;
+            }
+
+            const entry = ChangelogEntry{
+                .title = pr.title,
+                .url = pr.html_url,
+                .author = pr.user.login,
+                .number = pr.number,
+            };
+
+            try section_list.value_ptr.append(self.allocator, entry);
+        }
+
+        var unreleased: ?UnreleasedChanges = null;
+        if (has_unreleased) {
+            var unreleased_sections_array = try std.ArrayList(ChangelogSection).initCapacity(self.allocator, unreleased_sections_map.count());
+
+            var it = unreleased_sections_map.iterator();
+            while (it.next()) |entry| {
+                const changelog_section = ChangelogSection{
+                    .name = entry.key_ptr.*,
+                    .entries = try entry.value_ptr.toOwnedSlice(self.allocator),
+                };
+                unreleased_sections_array.appendAssumeCapacity(changelog_section);
+            }
+
+            unreleased = UnreleasedChanges{
+                .sections = try unreleased_sections_array.toOwnedSlice(self.allocator),
+            };
+        }
+
+        return Changelog{ .releases = try result.toOwnedSlice(self.allocator), .unreleased = unreleased };
     }
 
-    pub fn deinit(self: ChangelogGenerator, releases: []ChangelogRelease) void {
+    pub fn deinitChangelog(self: ChangelogGenerator, changelog: Changelog) void {
+        for (changelog.releases) |release| {
+            for (release.sections) |section| {
+                self.allocator.free(section.entries);
+            }
+            self.allocator.free(release.sections);
+        }
+        self.allocator.free(changelog.releases);
+        if (changelog.unreleased) |un| {
+            for (un.sections) |section| {
+                self.allocator.free(section.entries);
+            }
+            self.allocator.free(un.sections);
+        }
+    }
+
+    pub fn deinitLegacy(self: ChangelogGenerator, releases: []ChangelogRelease) void {
         for (releases) |release| {
             for (release.sections) |section| {
                 self.allocator.free(section.entries);
