@@ -530,5 +530,5 @@ pub fn main() !void {
         std.debug.print("... (truncated, total {d} bytes)\n", .{markdown.len});
     }
 
-    std.debug.print("\n✅ All {d} tests passed!\n", .{12});
+    std.debug.print("\n✅ Integration test completed successfully!\n", .{});
 }
