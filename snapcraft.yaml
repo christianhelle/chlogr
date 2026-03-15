@@ -5,15 +5,15 @@ title: Argiope
 summary: A fast, efficient, native CLI tool to automatically generate changelogs from GitHub tags, pull requests, and issue
 license: MIT
 source-code:
-  - https://github.com/christianhelle/changelog-generator
+  - https://github.com/christianhelle/chlogr
 website:
-  - https://christianhelle.com/changelog-generator
-  - https://github.com/christianhelle/changelog-generator
+  - https://christianhelle.com/chlogr
+  - https://github.com/christianhelle/chlogr
 contact:
   - https://christianhelle.com
   - https://github.com/christianhelle
 issues:
-  - https://github.com/christianhelle/changelog-generator/issues
+  - https://github.com/christianhelle/chlogr/issues
 donation:
   - https://paypal.me/christianhelle
   - https://buymeacoffee.com/christianhelle
@@ -50,7 +50,7 @@ parts:
     override-build: |
       snap install zig --classic --beta
 
-  changelog-generator:
+  chlogr:
     after: [zig]
     plugin: nil
     source: .
