@@ -19,7 +19,7 @@ donation:
   - https://buymeacoffee.com/christianhelle
   - https://github.com/sponsors/christianhelle
 description: |
-  Chlogr (CHangelog GeneratOR) is a fast, efficient, native CLI tool that automatically generates changelogs from GitHub tags, pull requests, and issues. Written in Zig with zero external dependencies, it produces clean Markdown changelogs categorized by type.
+  Chlogr (Changelog Generator) is a fast, efficient, native CLI tool that automatically generates changelogs from GitHub tags, pull requests, and issues. Written in Zig with zero external dependencies, it produces clean Markdown changelogs categorized by type.
 
   ## Features
 
