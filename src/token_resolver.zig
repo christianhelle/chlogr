@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub const ResolvedToken = struct {
     value: []const u8,
-    owned: bool,
+    has_token: bool,
 };
 
 pub const TokenResolver = struct {
@@ -19,13 +19,13 @@ pub const TokenResolver = struct {
     /// 2. Check GITHUB_TOKEN env var
     /// 3. Check GH_TOKEN env var
     /// 4. Try to get token from 'gh auth token' command
-    /// Returns a ResolvedToken with owned flag indicating if it needs to be freed
+    /// Returns a ResolvedToken - if no token found, returns empty string with has_token=false
     pub fn resolve(self: TokenResolver, provided_token: ?[]const u8) !ResolvedToken {
         // 1. Check provided token (not owned - don't free)
         if (provided_token) |token| {
             return ResolvedToken{
                 .value = token,
-                .owned = false,
+                .has_token = true,
             };
         }
 
@@ -33,7 +33,7 @@ pub const TokenResolver = struct {
         if (std.process.getEnvVarOwned(self.allocator, "GITHUB_TOKEN")) |token| {
             return ResolvedToken{
                 .value = token,
-                .owned = true,
+                .has_token = true,
             };
         } else |_| {}
 
@@ -41,7 +41,7 @@ pub const TokenResolver = struct {
         if (std.process.getEnvVarOwned(self.allocator, "GH_TOKEN")) |token| {
             return ResolvedToken{
                 .value = token,
-                .owned = true,
+                .has_token = true,
             };
         } else |_| {}
 
@@ -49,16 +49,20 @@ pub const TokenResolver = struct {
         if (self.getTokenFromGhCli()) |token| {
             return ResolvedToken{
                 .value = token,
-                .owned = true,
+                .has_token = true,
             };
         } else |_| {}
 
-        return error.NoTokenAvailable;
+        // No token found - return empty token but don't error
+        return ResolvedToken{
+            .value = "",
+            .has_token = false,
+        };
     }
 
     /// Attempt to get token from GitHub CLI command 'gh auth token'
     fn getTokenFromGhCli(self: TokenResolver) ![]const u8 {
-        var child = std.process.Child.init(&[_][]const u8{"gh", "auth", "token"}, self.allocator);
+        var child = std.process.Child.init(&[_][]const u8{ "gh", "auth", "token" }, self.allocator);
 
         child.stdout_behavior = .Pipe;
         child.stderr_behavior = .Pipe;
@@ -88,8 +92,8 @@ pub const TokenResolver = struct {
     }
 
     pub fn deinit(self: TokenResolver, resolved_token: ResolvedToken) void {
-        // Only free if it was allocated (from gh CLI or env var)
-        if (resolved_token.owned) {
+        // Only free if it was allocated (from gh CLI or env var) and has_token is true
+        if (resolved_token.has_token and resolved_token.value.len > 0) {
             self.allocator.free(resolved_token.value);
         }
     }
