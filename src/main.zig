@@ -35,15 +35,7 @@ pub fn main() !void {
 
     // Resolve GitHub token (optional - can work without token for public repos)
     const resolver = token_resolver.TokenResolver.init(allocator);
-    const resolved_token = resolver.resolve(parsed_args.token) catch |err| {
-        std.debug.print("Warning: Could not retrieve GitHub token: {}\n", .{err});
-        std.debug.print("  Will attempt without token (may have lower rate limits)\n", .{});
-        std.debug.print("  To get higher rate limits, provide a token via --token flag, GITHUB_TOKEN env var, GH_TOKEN env var, or gh CLI\n", .{});
-        std.debug.print("\n", .{});
-        resolver.deinit(.{ .value = "", .has_token = false });
-        try runWithEmptyToken(allocator, parsed_args);
-        return;
-    };
+    const resolved_token = try resolver.resolve(parsed_args.token);
     defer resolver.deinit(resolved_token);
 
     std.debug.print("GitHub Changelog Generator v0.1.0\n", .{});
@@ -90,48 +82,6 @@ pub fn main() !void {
     defer formatter.deinit(markdown);
 
     // Write to file
-    try formatter.writeToFile(parsed_args.output, markdown);
-
-    std.debug.print("Changelog written to {s}\n", .{parsed_args.output});
-}
-
-fn runWithEmptyToken(allocator: std.mem.Allocator, parsed_args: cli.CliArgs) !void {
-    std.debug.print("GitHub Changelog Generator v0.1.0\n", .{});
-    std.debug.print("Owner: {s}\n", .{parsed_args.owner.?});
-    std.debug.print("Repo: {s}\n", .{parsed_args.repo.?});
-    std.debug.print("Output: {s}\n", .{parsed_args.output});
-    std.debug.print("Token: none (anonymous access - may have lower rate limits)\n", .{});
-    std.debug.print("\nFetching data from GitHub...\n", .{});
-
-    var api_client = github_api.GitHubApiClient.init(allocator, "", parsed_args.owner.?, parsed_args.repo.?);
-    defer api_client.deinit();
-
-    const releases = api_client.getReleases() catch |err| {
-        if (err == error.GitHubApiError) {
-            std.debug.print("Error: GitHub API returned an error (check token validity and repo access)\n", .{});
-        } else {
-            std.debug.print("Error fetching releases: {}\n", .{err});
-        }
-        return err;
-    };
-    defer api_client.freeReleases(releases);
-
-    const prs = api_client.getMergedPullRequests(100) catch |err| {
-        std.debug.print("Error fetching pull requests: {}\n", .{err});
-        return err;
-    };
-    defer api_client.freePullRequests(prs);
-
-    std.debug.print("Found {d} releases and {d} pull requests\n", .{ releases.len, prs.len });
-
-    var gen = changelog_generator.ChangelogGenerator.init(allocator, parsed_args.exclude_labels);
-    const changelog = try gen.generate(releases, prs);
-    defer gen.deinitChangelog(changelog);
-
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator);
-    const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
-    defer formatter.deinit(markdown);
-
     try formatter.writeToFile(parsed_args.output, markdown);
 
     std.debug.print("Changelog written to {s}\n", .{parsed_args.output});

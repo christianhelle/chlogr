@@ -1,5 +1,10 @@
 const std = @import("std");
 
+pub const HttpResponse = struct {
+    status: std.http.Status,
+    body: []u8,
+};
+
 pub const HttpClient = struct {
     allocator: std.mem.Allocator,
     client: std.http.Client,
@@ -14,7 +19,7 @@ pub const HttpClient = struct {
         };
     }
 
-    pub fn get(self: *HttpClient, endpoint: []const u8) ![]u8 {
+    pub fn get(self: *HttpClient, endpoint: []const u8) !HttpResponse {
         const full_url = try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ self.base_url, endpoint });
         defer self.allocator.free(full_url);
 
@@ -25,8 +30,12 @@ pub const HttpClient = struct {
         try headers.append(self.allocator, .{ .name = "Accept", .value = "application/vnd.github.v3+json" });
         try headers.append(self.allocator, .{ .name = "Accept-Encoding", .value = "identity" });
 
+        var auth_header_value: ?[]u8 = null;
+        defer if (auth_header_value) |v| self.allocator.free(v);
+
         if (self.token.len > 0) {
-            try headers.append(self.allocator, .{ .name = "Authorization", .value = self.token });
+            auth_header_value = try std.fmt.allocPrint(self.allocator, "Bearer {s}", .{self.token});
+            try headers.append(self.allocator, .{ .name = "Authorization", .value = auth_header_value.? });
         }
 
         var body = std.Io.Writer.Allocating.init(self.allocator);
@@ -41,12 +50,13 @@ pub const HttpClient = struct {
             return err;
         };
 
-        if (result.status != .ok) {
-            return error.HttpError;
-        }
-
         var list = body.toArrayList();
-        return try list.toOwnedSlice(self.allocator);
+        const owned_body = try list.toOwnedSlice(self.allocator);
+
+        return HttpResponse{
+            .status = result.status,
+            .body = owned_body,
+        };
     }
 
     pub fn deinit(self: *HttpClient) void {
