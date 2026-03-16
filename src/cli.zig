@@ -1,7 +1,6 @@
 const std = @import("std");
 
 pub const CliArgs = struct {
-    owner: ?[]const u8 = null,
     repo: ?[]const u8 = null,
     token: ?[]const u8 = null,
     output: []const u8 = "CHANGELOG.md",
@@ -26,11 +25,7 @@ pub const CliParser = struct {
         while (i < args.len) : (i += 1) {
             const arg = args[i];
 
-            if (std.mem.eql(u8, arg, "--owner")) {
-                i += 1;
-                if (i >= args.len) return error.MissingOwnerValue;
-                result.owner = args[i];
-            } else if (std.mem.eql(u8, arg, "--repo")) {
+            if (std.mem.eql(u8, arg, "--repo")) {
                 i += 1;
                 if (i >= args.len) return error.MissingRepoValue;
                 result.repo = args[i];
@@ -69,23 +64,22 @@ pub const CliParser = struct {
         const help_text =
             \\GitHub Changelog Generator v0.1.0
             \\
-            \\Usage: chlogr --owner <owner> --repo <repo> [options]
+            \\Usage: chlogr --repo <[org|user]/[repo]> [options]
             \\
             \\Required:
-            \\  --owner <name>           GitHub organization or username
-            \\  --repo <name>            Repository name
+            \\  --repo <[org|user]/[repo]>  GitHub repository (e.g., github/cli)
             \\
             \\Options:
             \\  --token <token>          GitHub API token (falls back to env vars or gh CLI)
             \\  --output <path>          Output file (default: CHANGELOG.md)
             \\  --since-tag <tag>        Start from this tag/version
-            \\  --until-tag <tag>        End at this tag/version
+            \\  --until-tag <tag>       End at this tag/version
             \\  --exclude-labels <csv>   Comma-separated labels to exclude
             \\  --help, -h               Show this help message
             \\
             \\Examples:
-            \\  chlogr --owner github --repo cli
-            \\  chlogr --owner github --repo cli --token ghp_xxxx --output HISTORY.md
+            \\  chlogr --repo github/cli
+            \\  chlogr --repo github/cli --token ghp_xxxx --output HISTORY.md
             \\
         ;
         std.debug.print("{s}", .{help_text});
