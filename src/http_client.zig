@@ -26,16 +26,28 @@ pub const HttpClient = struct {
         var headers: std.ArrayList(std.http.Header) = .empty;
         defer headers.deinit(self.allocator);
 
-        try headers.append(self.allocator, .{ .name = "User-Agent", .value = "chlogr/0.1.0" });
-        try headers.append(self.allocator, .{ .name = "Accept", .value = "application/vnd.github.v3+json" });
-        try headers.append(self.allocator, .{ .name = "Accept-Encoding", .value = "identity" });
+        try headers.append(
+            self.allocator,
+            .{ .name = "User-Agent", .value = "chlogr/0.1.0" },
+        );
+        try headers.append(
+            self.allocator,
+            .{ .name = "Accept", .value = "application/vnd.github.v3+json" },
+        );
+        try headers.append(
+            self.allocator,
+            .{ .name = "Accept-Encoding", .value = "identity" },
+        );
 
         var auth_header_value: ?[]u8 = null;
         defer if (auth_header_value) |v| self.allocator.free(v);
 
         if (self.token.len > 0) {
             auth_header_value = try std.fmt.allocPrint(self.allocator, "Bearer {s}", .{self.token});
-            try headers.append(self.allocator, .{ .name = "Authorization", .value = auth_header_value.? });
+            try headers.append(
+                self.allocator,
+                .{ .name = "Authorization", .value = auth_header_value.? },
+            );
         }
 
         var body = std.Io.Writer.Allocating.init(self.allocator);
