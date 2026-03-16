@@ -29,15 +29,6 @@ pub const GitHubApiClient = struct {
             return error.GitHubApiError;
         }
 
-        // Check for error response
-        if (std.mem.indexOfScalar(u8, response.body, '"') != null and
-            std.mem.indexOfScalar(u8, response.body, ':') != null and
-            std.mem.indexOf(u8, response.body, "\"message\"") != null)
-        {
-            // Likely an error object, not an array
-            return error.GitHubApiError;
-        }
-
         // Parse JSON response with ignoring unknown fields
         var parsed = try std.json.parseFromSlice(
             []models.Release,
@@ -68,11 +59,6 @@ pub const GitHubApiClient = struct {
         defer self.allocator.free(response.body);
 
         if (response.status != .ok) {
-            return error.GitHubApiError;
-        }
-
-        // Check for error response
-        if (std.mem.indexOf(u8, response.body, "\"message\"") != null) {
             return error.GitHubApiError;
         }
 
@@ -121,11 +107,6 @@ pub const GitHubApiClient = struct {
         defer self.allocator.free(response.body);
 
         if (response.status != .ok) {
-            return error.GitHubApiError;
-        }
-
-        // Check for error response
-        if (std.mem.indexOf(u8, response.body, "\"message\"") != null) {
             return error.GitHubApiError;
         }
 
