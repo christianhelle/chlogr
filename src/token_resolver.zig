@@ -74,7 +74,7 @@ pub const TokenResolver = struct {
                 .is_owned = true,
             };
         } else |err| {
-            if (err != error.GhCliExited and err != error.EmptyToken) return err;
+            if (err != error.GhCliExited and err != error.EmptyToken and err != error.FileNotFound) return err;
         }
 
         // No token found - return empty token but don't error
