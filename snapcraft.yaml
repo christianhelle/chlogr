@@ -19,16 +19,70 @@ donation:
   - https://buymeacoffee.com/christianhelle
   - https://github.com/sponsors/christianhelle
 description: |
-  A fast, efficient, native CLI tool to automatically generate changelogs from GitHub tags, pull requests, and issues. Written in Zig
+  Chlogr (CHangelog GeneratOR) is a fast, efficient, native CLI tool that automatically generates changelogs from GitHub tags, pull requests, and issues. Written in Zig with zero external dependencies, it produces clean Markdown changelogs categorized by type.
 
-  Features
-  - Fast, compiled binary (zero dependencies, pure Zig stdlib)
-  - Generates Markdown changelogs automatically
-  - Categorizes entries by labels (Features, Bug Fixes, Other)
-  - Links to PRs, issues, and contributors
-  - Smart token resolution (--token flag → env vars → gh auth token CLI)
-  - Works with any GitHub repository
-  - Fully functional core logic verified with integration tests
+  ## Features
+
+  - Fast compiled binary with zero external dependencies (pure Zig stdlib)
+  - Generates Markdown changelogs from GitHub data automatically
+  - Categorizes entries by labels: Features, Bug Fixes, and Other
+  - Links to pull requests, issues, and contributors
+  - Smart token resolution with automatic fallback chain
+  - Tag-based filtering (--since-tag and --until-tag)
+  - Label exclusion support (--exclude-labels)
+  - Customizable output filename and path
+  - Works with any public or private GitHub repository
+  - Integration tests verify core logic
+
+  ## Command-Line Options
+
+  - `--repo` (required): GitHub repository in format [org]/[repo]. Example: github/cli
+  - `--token` (optional): GitHub API token. Falls back to env vars or gh CLI
+  - `--output` (optional): Output file path. Default: CHANGELOG.md
+  - `--since-tag` (optional): Start from this tag/version
+  - `--until-tag` (optional): End at this tag/version
+  - `--exclude-labels` (optional): Comma-separated labels to exclude
+  - `--help` or `-h`: Show help message
+
+  ## Authentication
+
+  The tool automatically retrieves a GitHub token in this order: 1) --token flag, 2) GITHUB_TOKEN env var, 3) GH_TOKEN env var, 4) gh auth token command. Required for private repos and recommended for higher rate limits.
+
+  ## Usage Examples
+
+  Basic: chlogr --repo owner/repository
+  With output: chlogr --repo owner/repository --output HISTORY.md
+  With token: chlogr --repo owner/repository --token ghp_xxxxxxxxxxxx
+  Tag range: chlogr --repo owner/repository --since-tag v1.0.0 --until-tag v2.0.0
+  Exclude labels: chlogr --repo owner/repository --exclude-labels duplicate,wontfix
+
+  ## Technical Details
+
+  - Built with Zig 0.15+ for native performance
+  - Zero external dependencies - Zig stdlib only
+  - Single portable executable
+  - Cross-platform (Linux, macOS, Windows)
+  - Modular architecture: CLI parsing, token resolution, GitHub API, changelog generation, markdown formatting
+
+  ## Output Format
+
+  Generated changelogs include release/version headers with links, release dates, categorized entries (Features, Bug Fixes, Other), PR/issue numbers with links, contributor usernames with profile links, and clean Markdown formatting.
+
+  ## Installation
+
+  Via snap: sudo snap install chlogr
+  From source: git clone https://github.com/christianhelle/chlogr && cd chlogr && zig build
+
+  ## Requirements
+
+  - GitHub account (for private repos or higher rate limits)
+  - GitHub API token (optional but recommended)
+  - Zig 0.15+ for building from source
+
+  ## Links
+
+  Source: https://github.com/christianhelle/chlogr
+  Issues: https://github.com/christianhelle/chlogr/issues
 
 grade: stable
 confinement: strict
