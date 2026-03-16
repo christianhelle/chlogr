@@ -27,8 +27,8 @@ pub fn main() !void {
     };
 
     // Validate required arguments
-    if (parsed_args.owner == null or parsed_args.repo == null) {
-        std.debug.print("Error: --owner and --repo are required\n\n", .{});
+    if (parsed_args.repo == null) {
+        std.debug.print("Error: --repo is required\n\n", .{});
         cli.CliParser.printHelp();
         return error.MissingRequiredArgs;
     }
@@ -39,7 +39,6 @@ pub fn main() !void {
     defer resolver.deinit(resolved_token);
 
     std.debug.print("GitHub Changelog Generator v0.1.0\n", .{});
-    std.debug.print("Owner: {s}\n", .{parsed_args.owner.?});
     std.debug.print("Repo: {s}\n", .{parsed_args.repo.?});
     std.debug.print("Output: {s}\n", .{parsed_args.output});
     if (!resolved_token.has_token) {
@@ -49,7 +48,7 @@ pub fn main() !void {
     std.debug.print("\nFetching data from GitHub...\n", .{});
 
     // Initialize GitHub API client
-    var api_client = github_api.GitHubApiClient.init(allocator, resolved_token.value, parsed_args.owner.?, parsed_args.repo.?);
+    var api_client = github_api.GitHubApiClient.init(allocator, resolved_token.value, parsed_args.repo.?);
     defer api_client.deinit();
 
     // Fetch releases and PRs
