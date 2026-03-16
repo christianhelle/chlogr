@@ -64,22 +64,22 @@ pub const CliParser = struct {
         const help_text =
             \\GitHub Changelog Generator v0.1.0
             \\
-            \\Usage: chlogr --owner <owner> --repo <repo> [options]
+            \\Usage: chlogr --repo <[org|user]/[repo]> [options]
             \\
             \\Required:
-            \\  --repo <name>            [Organization or Username]/[Repository name]
+            \\  --repo <[org|user]/[repo]>  GitHub repository (e.g., github/cli)
             \\
             \\Options:
             \\  --token <token>          GitHub API token (falls back to env vars or gh CLI)
             \\  --output <path>          Output file (default: CHANGELOG.md)
             \\  --since-tag <tag>        Start from this tag/version
-            \\  --until-tag <tag>        End at this tag/version
+            \\  --until-tag <tag>       End at this tag/version
             \\  --exclude-labels <csv>   Comma-separated labels to exclude
             \\  --help, -h               Show this help message
             \\
             \\Examples:
-            \\  chlogr --owner github --repo cli
-            \\  chlogr --owner github --repo cli --token ghp_xxxx --output HISTORY.md
+            \\  chlogr --repo github/cli
+            \\  chlogr --repo github/cli --token ghp_xxxx --output HISTORY.md
             \\
         ;
         std.debug.print("{s}", .{help_text});
