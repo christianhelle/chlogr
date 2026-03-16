@@ -33,6 +33,7 @@ pub const TokenResolver = struct {
 
         // 2. Check GITHUB_TOKEN env var (owned - must free)
         if (std.process.getEnvVarOwned(self.allocator, "GITHUB_TOKEN")) |token| {
+            std.debug.print("Using GITHUB_TOKEN from environment variable\n", .{});
             return ResolvedToken{
                 .value = token,
                 .has_token = true,
@@ -42,6 +43,7 @@ pub const TokenResolver = struct {
 
         // 3. Check GH_TOKEN env var (owned - must free)
         if (std.process.getEnvVarOwned(self.allocator, "GH_TOKEN")) |token| {
+            std.debug.print("Using GH_TOKEN from environment variable\n", .{});
             return ResolvedToken{
                 .value = token,
                 .has_token = true,
@@ -51,6 +53,7 @@ pub const TokenResolver = struct {
 
         // 4. Try to get token from gh CLI (owned - must free)
         if (self.getTokenFromGhCli()) |token| {
+            std.debug.print("Using token from 'gh auth token' command\n", .{});
             return ResolvedToken{
                 .value = token,
                 .has_token = true,
@@ -59,6 +62,7 @@ pub const TokenResolver = struct {
         } else |_| {}
 
         // No token found - return empty token but don't error
+        std.debug.print("No GitHub token provided or found - proceeding without token (may have lower rate limits)\n", .{});
         return ResolvedToken{
             .value = "",
             .has_token = false,

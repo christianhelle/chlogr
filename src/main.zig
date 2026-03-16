@@ -50,9 +50,7 @@ pub fn main() !void {
     std.debug.print("Owner: {s}\n", .{parsed_args.owner.?});
     std.debug.print("Repo: {s}\n", .{parsed_args.repo.?});
     std.debug.print("Output: {s}\n", .{parsed_args.output});
-    if (resolved_token.has_token) {
-        std.debug.print("Token: provided\n", .{});
-    } else {
+    if (!resolved_token.has_token) {
         std.debug.print("Token: none (anonymous access - may have lower rate limits)\n", .{});
         std.debug.print("  To get higher rate limits, provide a token via --token flag, GITHUB_TOKEN env var, GH_TOKEN env var, or gh CLI\n", .{});
     }
