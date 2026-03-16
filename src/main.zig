@@ -33,25 +33,24 @@ pub fn main() !void {
         return error.MissingRequiredArgs;
     }
 
-    // Resolve GitHub token
+    // Resolve GitHub token (optional - can work without token for public repos)
     const resolver = token_resolver.TokenResolver.init(allocator);
-    const resolved_token = resolver.resolve(parsed_args.token) catch |err| {
-        std.debug.print("Error: Could not retrieve GitHub token\n", .{});
-        std.debug.print("  Tried: --token flag, GITHUB_TOKEN env var, GH_TOKEN env var, gh CLI\n", .{});
-        std.debug.print("  Details: {}\n", .{err});
-        return err;
-    };
+    const resolved_token = try resolver.resolve(parsed_args.token);
     defer resolver.deinit(resolved_token);
-
-    // Initialize GitHub API client
-    var api_client = github_api.GitHubApiClient.init(allocator, resolved_token.value, parsed_args.owner.?, parsed_args.repo.?);
-    defer api_client.deinit();
 
     std.debug.print("GitHub Changelog Generator v0.1.0\n", .{});
     std.debug.print("Owner: {s}\n", .{parsed_args.owner.?});
     std.debug.print("Repo: {s}\n", .{parsed_args.repo.?});
     std.debug.print("Output: {s}\n", .{parsed_args.output});
+    if (!resolved_token.has_token) {
+        std.debug.print("Token: none (anonymous access - may have lower rate limits)\n", .{});
+        std.debug.print("  To get higher rate limits, provide a token via --token flag, GITHUB_TOKEN env var, GH_TOKEN env var, or gh CLI\n", .{});
+    }
     std.debug.print("\nFetching data from GitHub...\n", .{});
+
+    // Initialize GitHub API client
+    var api_client = github_api.GitHubApiClient.init(allocator, resolved_token.value, parsed_args.owner.?, parsed_args.repo.?);
+    defer api_client.deinit();
 
     // Fetch releases and PRs
     const releases = api_client.getReleases() catch |err| {

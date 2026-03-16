@@ -1,7 +1,7 @@
 name: chlogr
 base: core22
 version: 0.1.1
-title: Argiope
+title: Changelog Generator
 summary: A fast, efficient, native CLI tool to automatically generate changelogs from GitHub tags, pull requests, and issue
 license: MIT
 source-code:
