@@ -3,6 +3,7 @@ const std = @import("std");
 pub const ResolvedToken = struct {
     value: []const u8,
     has_token: bool,
+    is_owned: bool,
 };
 
 pub const TokenResolver = struct {
@@ -26,6 +27,7 @@ pub const TokenResolver = struct {
             return ResolvedToken{
                 .value = token,
                 .has_token = true,
+                .is_owned = false,
             };
         }
 
@@ -34,6 +36,7 @@ pub const TokenResolver = struct {
             return ResolvedToken{
                 .value = token,
                 .has_token = true,
+                .is_owned = true,
             };
         } else |_| {}
 
@@ -42,6 +45,7 @@ pub const TokenResolver = struct {
             return ResolvedToken{
                 .value = token,
                 .has_token = true,
+                .is_owned = true,
             };
         } else |_| {}
 
@@ -50,6 +54,7 @@ pub const TokenResolver = struct {
             return ResolvedToken{
                 .value = token,
                 .has_token = true,
+                .is_owned = true,
             };
         } else |_| {}
 
@@ -57,6 +62,7 @@ pub const TokenResolver = struct {
         return ResolvedToken{
             .value = "",
             .has_token = false,
+            .is_owned = false,
         };
     }
 
@@ -92,8 +98,8 @@ pub const TokenResolver = struct {
     }
 
     pub fn deinit(self: TokenResolver, resolved_token: ResolvedToken) void {
-        // Only free if it was allocated (from gh CLI or env var) and has_token is true
-        if (resolved_token.has_token and resolved_token.value.len > 0) {
+        // Only free if it was allocated (from gh CLI or env var)
+        if (resolved_token.is_owned) {
             self.allocator.free(resolved_token.value);
         }
     }

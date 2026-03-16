@@ -18,17 +18,15 @@ pub const HttpClient = struct {
         const full_url = try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ self.base_url, endpoint });
         defer self.allocator.free(full_url);
 
-        var headers: [4]std.http.Header = undefined;
-        headers[0] = .{ .name = "User-Agent", .value = "chlogr/0.1.0" };
-        headers[1] = .{ .name = "Accept", .value = "application/vnd.github.v3+json" };
-        headers[2] = .{ .name = "Accept-Encoding", .value = "identity" };
+        var headers: std.ArrayList(std.http.Header) = .empty;
+        defer headers.deinit(self.allocator);
 
-        var header_count: usize = 3;
+        try headers.append(self.allocator, .{ .name = "User-Agent", .value = "chlogr/0.1.0" });
+        try headers.append(self.allocator, .{ .name = "Accept", .value = "application/vnd.github.v3+json" });
+        try headers.append(self.allocator, .{ .name = "Accept-Encoding", .value = "identity" });
+
         if (self.token.len > 0) {
-            const auth_value = try std.fmt.allocPrint(self.allocator, "token {s}", .{self.token});
-            defer self.allocator.free(auth_value);
-            headers[3] = .{ .name = "Authorization", .value = auth_value };
-            header_count = 4;
+            try headers.append(self.allocator, .{ .name = "Authorization", .value = self.token });
         }
 
         var body = std.Io.Writer.Allocating.init(self.allocator);
@@ -37,7 +35,7 @@ pub const HttpClient = struct {
         const result = self.client.fetch(.{
             .method = .GET,
             .location = .{ .url = full_url },
-            .extra_headers = headers[0..header_count],
+            .extra_headers = headers.items,
             .response_writer = &body.writer,
         }) catch |err| {
             return err;
