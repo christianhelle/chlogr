@@ -26,8 +26,7 @@ zig build
 
 ```bash
 ./zig-out/bin/chlogr \
-  --owner github \
-  --repo cli \
+  --repo github/cli \
   --output CHANGELOG.md
 ```
 
@@ -35,16 +34,14 @@ zig build
 
 ```bash
 ./zig-out/bin/chlogr \
-  --owner github \
-  --repo cli \
+  --repo github/cli \
   --token ghp_xxxxxxxxxxxx \
   --output CHANGELOG.md
 ```
 
 ### Options
 
-- `--owner` (required): GitHub organization or username
-- `--repo` (required): Repository name
+- `--repo` (required): GitHub repository in the format `[Organization or Username]/[Repository name]`
 - `--token` (optional): GitHub API token (falls back to env vars or `gh` CLI)
 - `--output` (optional): Output file path (default: CHANGELOG.md)
 - `--since-tag` (optional): Start from this tag/version
