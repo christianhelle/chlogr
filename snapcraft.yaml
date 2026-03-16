@@ -1,6 +1,6 @@
 name: chlogr
 base: core22
-version: 0.1.1
+version: 0.1.2
 title: Changelog Generator
 summary: A fast, efficient, native CLI tool to automatically generate changelogs from GitHub tags, pull requests, and issue
 license: MIT
