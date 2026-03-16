@@ -23,13 +23,9 @@ pub const GitHubApiClient = struct {
         defer self.allocator.free(endpoint);
 
         const response = try self.http_client.get(endpoint);
-        defer self.allocator.free(response);
+        defer self.allocator.free(response.body);
 
-        // Check for error response
-        if (std.mem.indexOfScalar(u8, response, '"') != null and 
-            std.mem.indexOfScalar(u8, response, ':') != null and
-            std.mem.indexOf(u8, response, "\"message\"") != null) {
-            // Likely an error object, not an array
+        if (response.status != .ok) {
             return error.GitHubApiError;
         }
 
@@ -37,7 +33,7 @@ pub const GitHubApiClient = struct {
         var parsed = try std.json.parseFromSlice(
             []models.Release,
             self.allocator,
-            response,
+            response.body,
             .{ .ignore_unknown_fields = true },
         );
         defer parsed.deinit();
@@ -60,17 +56,16 @@ pub const GitHubApiClient = struct {
         defer self.allocator.free(endpoint);
 
         const response = try self.http_client.get(endpoint);
-        defer self.allocator.free(response);
+        defer self.allocator.free(response.body);
 
-        // Check for error response
-        if (std.mem.indexOf(u8, response, "\"message\"") != null) {
+        if (response.status != .ok) {
             return error.GitHubApiError;
         }
 
         var parsed = try std.json.parseFromSlice(
             []models.PullRequest,
             self.allocator,
-            response,
+            response.body,
             .{ .ignore_unknown_fields = true },
         );
         defer parsed.deinit();
@@ -109,17 +104,16 @@ pub const GitHubApiClient = struct {
         defer self.allocator.free(endpoint);
 
         const response = try self.http_client.get(endpoint);
-        defer self.allocator.free(response);
+        defer self.allocator.free(response.body);
 
-        // Check for error response
-        if (std.mem.indexOf(u8, response, "\"message\"") != null) {
+        if (response.status != .ok) {
             return error.GitHubApiError;
         }
 
         var parsed = try std.json.parseFromSlice(
             []models.Issue,
             self.allocator,
-            response,
+            response.body,
             .{ .ignore_unknown_fields = true },
         );
         defer parsed.deinit();
