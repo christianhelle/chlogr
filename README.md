@@ -114,13 +114,6 @@ src/
   └── test.zig                # Integration tests
 ```
 
-## Known Limitations
-
-1. **HTTP Implementation**: Currently uses mock data. Real GitHub API integration pending.
-2. **No Pagination**: Not tested with large repositories (>100 PRs)
-3. **Limited Filtering**: Date range filtering not yet implemented
-4. **No Caching**: Makes fresh API calls each time
-
 ## License
 
 MIT
