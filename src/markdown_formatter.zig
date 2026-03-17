@@ -1,6 +1,15 @@
 const std = @import("std");
 const changelog_generator = @import("changelog_generator.zig");
 
+fn parseDateToSlice(date_str: []const u8) []const u8 {
+    for (date_str, 0..) |c, i| {
+        if (c == 'T') {
+            return date_str[0..i];
+        }
+    }
+    return date_str;
+}
+
 pub const MarkdownFormatter = struct {
     allocator: std.mem.Allocator,
 
@@ -70,10 +79,11 @@ pub const MarkdownFormatter = struct {
         }
 
         for (releases) |release| {
-            const header = try std.fmt.allocPrint(self.allocator, "## [{s}](https://github.com/owner/repo/releases/tag/{s}) - {s}\n\n", .{
+            const date_only = parseDateToSlice(release.date);
+            const header = try std.fmt.allocPrint(self.allocator, "## [{s}](https://github.com/owner/repo/releases/tag/{s}) ({s})\n\n", .{
                 release.version,
                 release.version,
-                release.date,
+                date_only,
             });
             try parts.append(self.allocator, header);
 
