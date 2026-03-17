@@ -64,7 +64,7 @@ If none are available, the tool will display a helpful error message.
 ```markdown
 # Changelog
 
-## [v1.2.0](https://github.com/owner/repo/releases/tag/v1.2.0) - 2024-01-15
+## [v1.2.0](https://github.com/owner/repo/releases/tag/v1.2.0) (2024-01-15)
 
 ### Features
 
@@ -78,7 +78,7 @@ If none are available, the tool will display a helpful error message.
 
 - Update documentation (#125) (@charlie)
 
-## [v1.1.0](https://github.com/owner/repo/releases/tag/v1.1.0) - 2024-01-10
+## [v1.1.0](https://github.com/owner/repo/releases/tag/v1.1.0) (2024-01-10)
 
 ...
 ```
