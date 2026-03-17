@@ -25,3 +25,7 @@ CHANGELOG.md.test
 .zig-cache
 CHANGELOG_TEST.md
 CHANGELOG.md
+parts
+prime
+stage/bin
+*.snap
