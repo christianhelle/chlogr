@@ -99,41 +99,49 @@ pub const GitHubApiClient = struct {
         };
     }
 
-    /// Fetch all releases/tags for the repository
+    /// Fetch all releases/tags for the repository (paginated)
     pub fn getReleases(self: *GitHubApiClient) ![]models.Release {
-        const endpoint = try std.fmt.allocPrint(self.allocator, "/repos/{s}/releases", .{self.repo});
-        defer self.allocator.free(endpoint);
-
-        const response = try self.http_client.get(endpoint);
-        defer self.allocator.free(response.body);
-
-        if (response.status != .ok) {
-            return error.GitHubApiError;
-        }
-
-        // Parse JSON response with ignoring unknown fields
-        var parsed = try std.json.parseFromSlice(
-            []models.Release,
-            self.allocator,
-            response.body,
-            .{ .ignore_unknown_fields = true },
-        );
-        defer parsed.deinit();
-
-        // Deep copy releases with string duplication
-        var releases = try std.ArrayList(models.Release).initCapacity(self.allocator, parsed.value.len);
+        const per_page: u32 = 100;
+        var page: u32 = 1;
+        var all_releases = try std.ArrayList(models.Release).initCapacity(self.allocator, 0);
         errdefer {
-            for (releases.items) |r| {
+            for (all_releases.items) |r| {
                 self.allocator.free(r.tag_name);
                 self.allocator.free(r.name);
                 self.allocator.free(r.published_at);
             }
-            releases.deinit(self.allocator);
+            all_releases.deinit(self.allocator);
         }
-        for (parsed.value) |release| {
-            releases.appendAssumeCapacity(try copyRelease(self.allocator, release));
+
+        while (true) {
+            const endpoint = try std.fmt.allocPrint(self.allocator, "/repos/{s}/releases?page={d}&per_page={d}", .{ self.repo, page, per_page });
+            defer self.allocator.free(endpoint);
+
+            const response = try self.http_client.get(endpoint);
+            defer self.allocator.free(response.body);
+
+            if (response.status != .ok) {
+                return error.GitHubApiError;
+            }
+
+            var parsed = try std.json.parseFromSlice(
+                []models.Release,
+                self.allocator,
+                response.body,
+                .{ .ignore_unknown_fields = true },
+            );
+            defer parsed.deinit();
+
+            const page_count = parsed.value.len;
+            for (parsed.value) |release| {
+                try all_releases.append(self.allocator, try copyRelease(self.allocator, release));
+            }
+
+            if (page_count < per_page) break;
+            page += 1;
         }
-        return try releases.toOwnedSlice(self.allocator);
+
+        return try all_releases.toOwnedSlice(self.allocator);
     }
 
     /// Fetch merged pull requests
