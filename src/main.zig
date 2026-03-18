@@ -50,31 +50,50 @@ pub fn main() !void {
     defer api_client.deinit();
 
     // Fetch releases and PRs
-    std.debug.print("\nFetching releases...\n", .{});
-    const releases = api_client.getReleases() catch |err| {
-        if (err == error.GitHubApiError) {
-            std.debug.print("Error: GitHub API returned an error (check token validity and repo access)\n", .{});
-        } else {
-            std.debug.print("Error fetching releases: {}\n", .{err});
-        }
-        return err;
+    const FetchedData = struct {
+        releases: []models.Release,
+        prs: []models.PullRequest,
     };
-    defer api_client.freeReleases(releases);
 
-    std.debug.print("Fetching pull requests...\n", .{});
-    const prs = api_client.getMergedPullRequests() catch |err| {
-        std.debug.print("Error fetching pull requests: {}\n", .{err});
-        return err;
+    const fetched: FetchedData = if (parsed_args.parallel) blk: {
+        std.debug.print("\nFetching data in parallel...\n", .{});
+        var fetcher = github_api.ParallelFetcher.init(allocator, resolved_token.value, parsed_args.repo.?);
+        const fetch_results = fetcher.fetch() catch |err| {
+            if (err == error.GitHubApiError) {
+                std.debug.print("Error: GitHub API returned an error (check token validity and repo access)\n", .{});
+            } else {
+                std.debug.print("Error fetching data in parallel: {}\n", .{err});
+            }
+            return err;
+        };
+        break :blk .{ .releases = fetch_results.releases, .prs = fetch_results.prs };
+    } else blk: {
+        std.debug.print("\nFetching releases...\n", .{});
+        const releases = api_client.getReleases() catch |err| {
+            if (err == error.GitHubApiError) {
+                std.debug.print("Error: GitHub API returned an error (check token validity and repo access)\n", .{});
+            } else {
+                std.debug.print("Error fetching releases: {}\n", .{err});
+            }
+            return err;
+        };
+        std.debug.print("Fetching pull requests...\n", .{});
+        const prs = api_client.getMergedPullRequests() catch |err| {
+            std.debug.print("Error fetching pull requests: {}\n", .{err});
+            return err;
+        };
+        break :blk .{ .releases = releases, .prs = prs };
     };
-    defer api_client.freePullRequests(prs);
+    defer api_client.freeReleases(fetched.releases);
+    defer api_client.freePullRequests(fetched.prs);
 
-    std.debug.print("Found {d} releases and {d} pull requests\n", .{ releases.len, prs.len });
+    std.debug.print("Found {d} releases and {d} pull requests\n", .{ fetched.releases.len, fetched.prs.len });
 
     // Generate changelog
     var gen = changelog_generator.ChangelogGenerator.init(allocator, parsed_args.exclude_labels);
     gen.since_tag = parsed_args.since_tag;
     gen.until_tag = parsed_args.until_tag;
-    const changelog = gen.generate(releases, prs) catch |err| {
+    const changelog = gen.generate(fetched.releases, fetched.prs) catch |err| {
         if (err == error.SinceTagNotFound) {
             std.debug.print("Error: --since-tag '{s}' was not found in the fetched releases\n", .{parsed_args.since_tag.?});
             return err;
