@@ -410,6 +410,44 @@ fn testLegacyFormatMethod() !void {
     try std.testing.expect(markdown.len > 0);
 }
 
+fn testFailingAllocator() !void {
+    var failing_allocator = std.testing.FailingAllocator.init(std.heap.page_allocator, .{
+        .fail_index = 15, // Fail after a few allocations
+    });
+    const allocator = failing_allocator.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        std.heap.page_allocator,
+        test_data.test_releases,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        std.heap.page_allocator,
+        test_data.test_pull_requests,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    
+    // This should propagate error cleanly without undefined behavior
+    const result = gen.generate(releases, prs);
+    
+    if (result) |changelog| {
+        // If it succeeded despite failing allocator, clean up
+        gen.deinitChangelog(changelog);
+    } else |err| {
+        // Expected to fail - this is the success case for this test
+        try std.testing.expect(err == error.OutOfMemory);
+    }
+}
+
 pub fn main() !void {
     std.debug.print("=== Changelog Generator Integration Test ===\n\n", .{});
 
@@ -455,6 +493,10 @@ pub fn main() !void {
 
     std.debug.print("Running testLegacyFormatMethod...\n", .{});
     try testLegacyFormatMethod();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testFailingAllocator...\n", .{});
+    try testFailingAllocator();
     std.debug.print("  PASSED\n", .{});
 
     std.debug.print("\n=== Integration Test with Output ===\n\n", .{});
