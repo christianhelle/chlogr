@@ -91,7 +91,7 @@ pub const TokenResolver = struct {
         var child = std.process.Child.init(&[_][]const u8{ "gh", "auth", "token" }, self.allocator);
 
         child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Pipe;
+        child.stderr_behavior = .Ignore;
 
         try child.spawn();
         defer {
@@ -104,8 +104,9 @@ pub const TokenResolver = struct {
 
         const term = try child.wait();
 
-        if (term.Exited != 0) {
-            return error.GhCliExited;
+        switch (term) {
+            .Exited => |code| if (code != 0) return error.GhCliExited,
+            else => return error.GhCliExited,
         }
 
         // Trim whitespace from output
