@@ -24,9 +24,19 @@ src/
   test.zig                 # Integration tests
 ```
 
-## Learnings
+### Issue #8 — Rebase PR #18 (`fix/8-since-until-tags`) onto main after PR #19 merged
 
-### Issue #7 — GitHub API pagination for releases and merged PRs (PR #21)
+**Context:** PR #19 (timestamp precision fix) was merged to main before PR #18 (since/until tag filtering). Both PRs modified `changelog_generator.zig`, `test.zig`, and `test_data.zig`, causing merge conflicts.
+
+**Integration approach:**
+- `filterReleasesByTagRange` from PR #18 is called **first** in `generate()`, before the PR #19 sort/assign logic. The filtered slice is then duped and sorted oldest-first for the greedy single-pass assignment.
+- `assigned[]` tracking from PR #19 is preserved unchanged.
+- Test data from both PRs is kept (`test_releases_same_day`, `test_releases_two_versions`, `test_pull_requests_pre_first_release` from PR #19; `test_releases_four_versions`, `test_prs_for_four_versions` from PR #18).
+- PR #18's tag-filter test expectations (`testSinceTagFilter`, `testUntilTagFilter`, `testBothTagsFilter`) were updated to reflect oldest-first ordering in `changelog.releases[]` — a consequence of PR #19's sort approach.
+- All 17 tests pass after rebase.
+
+**Git technique:** Used `git worktree` to create an isolated working directory (`C:\temp\chlogr-rebase`) so a concurrent agent switching branches in the main worktree could not interrupt the in-progress rebase.
+
 
 **Approach used:**
 Both `getReleases` and `getMergedPullRequests` were converted from single-request functions to pagination loops. Each iteration appends `?page=N&per_page=100` to the endpoint URL, copies items into a persistent `ArrayList`, and breaks when the page returns fewer items than `per_page` (signalling the last page). The `per_page` parameter was removed from both public function signatures — callers no longer need to manage limits.
