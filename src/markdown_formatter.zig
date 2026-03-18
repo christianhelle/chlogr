@@ -12,10 +12,12 @@ fn parseDateToSlice(date_str: []const u8) []const u8 {
 
 pub const MarkdownFormatter = struct {
     allocator: std.mem.Allocator,
+    repo: []const u8,
 
-    pub fn init(allocator: std.mem.Allocator) MarkdownFormatter {
+    pub fn init(allocator: std.mem.Allocator, repo: []const u8) MarkdownFormatter {
         return MarkdownFormatter{
             .allocator = allocator,
+            .repo = repo,
         };
     }
 
@@ -80,8 +82,9 @@ pub const MarkdownFormatter = struct {
 
         for (releases) |release| {
             const date_only = parseDateToSlice(release.date);
-            const header = try std.fmt.allocPrint(self.allocator, "## [{s}](https://github.com/owner/repo/releases/tag/{s}) ({s})\n\n", .{
+            const header = try std.fmt.allocPrint(self.allocator, "## [{s}](https://github.com/{s}/releases/tag/{s}) ({s})\n\n", .{
                 release.version,
+                self.repo,
                 release.version,
                 date_only,
             });
