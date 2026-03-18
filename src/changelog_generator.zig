@@ -126,10 +126,9 @@ pub const ChangelogGenerator = struct {
 
                 const category = self.categorizeEntry(pr.labels);
 
-                var section_list = sections_map.getOrPut(category) catch continue;
+                var section_list = try sections_map.getOrPut(category);
                 if (!section_list.found_existing) {
-                    const arr = try std.ArrayList(ChangelogEntry).initCapacity(self.allocator, prs.len);
-                    section_list.value_ptr.* = arr;
+                    section_list.value_ptr.* = std.ArrayList(ChangelogEntry).empty;
                 }
 
                 const entry = ChangelogEntry{
@@ -187,10 +186,9 @@ pub const ChangelogGenerator = struct {
             has_unreleased = true;
             const category = self.categorizeEntry(pr.labels);
 
-            var section_list = unreleased_sections_map.getOrPut(category) catch continue;
+            var section_list = try unreleased_sections_map.getOrPut(category);
             if (!section_list.found_existing) {
-                const arr = try std.ArrayList(ChangelogEntry).initCapacity(self.allocator, prs.len);
-                section_list.value_ptr.* = arr;
+                section_list.value_ptr.* = std.ArrayList(ChangelogEntry).empty;
             }
 
             const entry = ChangelogEntry{

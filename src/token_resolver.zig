@@ -87,11 +87,12 @@ pub const TokenResolver = struct {
     }
 
     /// Attempt to get token from GitHub CLI command 'gh auth token'
-    fn getTokenFromGhCli(self: TokenResolver) ![]const u8 {
+    /// Note: Exposed for testing purposes only
+    pub fn getTokenFromGhCli(self: TokenResolver) ![]const u8 {
         var child = std.process.Child.init(&[_][]const u8{ "gh", "auth", "token" }, self.allocator);
 
         child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Pipe;
+        child.stderr_behavior = .Ignore; // Ignore stderr to avoid deadlock
 
         try child.spawn();
         defer {
@@ -104,8 +105,16 @@ pub const TokenResolver = struct {
 
         const term = try child.wait();
 
-        if (term.Exited != 0) {
-            return error.GhCliExited;
+        // Use explicit switch to handle all termination cases
+        switch (term) {
+            .Exited => |code| {
+                if (code != 0) {
+                    return error.GhCliExited;
+                }
+            },
+            .Signal, .Stopped, .Unknown => {
+                return error.GhCliExited;
+            },
         }
 
         // Trim whitespace from output
