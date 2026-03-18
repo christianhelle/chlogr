@@ -294,6 +294,111 @@ pub const GitHubApiClient = struct {
     }
 };
 
+/// Results container for parallel fetch — fields written by threads, read by main after join
+pub const ParallelFetchResults = struct {
+    releases: []models.Release = &.{},
+    prs: []models.PullRequest = &.{},
+    releases_err: ?anyerror = null,
+    prs_err: ?anyerror = null,
+};
+
+/// Context passed to each thread
+const ReleasesThreadCtx = struct {
+    allocator: std.mem.Allocator,
+    token: []const u8,
+    repo: []const u8,
+    results: *ParallelFetchResults,
+};
+
+const PrsThreadCtx = struct {
+    allocator: std.mem.Allocator,
+    token: []const u8,
+    repo: []const u8,
+    results: *ParallelFetchResults,
+};
+
+fn releasesThreadFn(ctx: ReleasesThreadCtx) void {
+    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    defer client.deinit();
+    ctx.results.releases = client.getReleases() catch |err| {
+        ctx.results.releases_err = err;
+        return;
+    };
+}
+
+fn prsThreadFn(ctx: PrsThreadCtx) void {
+    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    defer client.deinit();
+    ctx.results.prs = client.getMergedPullRequests() catch |err| {
+        ctx.results.prs_err = err;
+        return;
+    };
+}
+
+pub const ParallelFetcher = struct {
+    allocator: std.mem.Allocator,
+    token: []const u8,
+    repo: []const u8,
+
+    pub fn init(allocator: std.mem.Allocator, token: []const u8, repo: []const u8) ParallelFetcher {
+        return .{ .allocator = allocator, .token = token, .repo = repo };
+    }
+
+    /// Fetch releases and PRs concurrently. Caller owns the returned slices.
+    /// On error, any successfully fetched data is freed before returning.
+    pub fn fetch(self: *ParallelFetcher) !ParallelFetchResults {
+        var results = ParallelFetchResults{};
+
+        const releases_ctx = ReleasesThreadCtx{
+            .allocator = self.allocator,
+            .token = self.token,
+            .repo = self.repo,
+            .results = &results,
+        };
+        const prs_ctx = PrsThreadCtx{
+            .allocator = self.allocator,
+            .token = self.token,
+            .repo = self.repo,
+            .results = &results,
+        };
+
+        const releases_thread = try std.Thread.spawn(.{}, releasesThreadFn, .{releases_ctx});
+        const prs_thread = try std.Thread.spawn(.{}, prsThreadFn, .{prs_ctx});
+
+        releases_thread.join();
+        prs_thread.join();
+
+        // Check for errors — free any successfully fetched data before returning error
+        if (results.releases_err) |err| {
+            if (results.prs.len > 0) {
+                // free prs using a temporary client for the free methods
+                var tmp = GitHubApiClient.init(self.allocator, self.token, self.repo);
+                defer tmp.deinit();
+                tmp.freePullRequests(results.prs);
+            }
+            return err;
+        }
+        if (results.prs_err) |err| {
+            if (results.releases.len > 0) {
+                var tmp = GitHubApiClient.init(self.allocator, self.token, self.repo);
+                defer tmp.deinit();
+                tmp.freeReleases(results.releases);
+            }
+            return err;
+        }
+
+        return results;
+    }
+};
+
+test "ParallelFetchResults default fields" {
+    const r = ParallelFetchResults{};
+    try std.testing.expect(r.releases.len == 0);
+    try std.testing.expect(r.prs.len == 0);
+    try std.testing.expect(r.releases_err == null);
+    try std.testing.expect(r.prs_err == null);
+}
+
 test "copyLabel cleans up on allocation failure" {
     const src = models.Label{ .name = "bug", .color = "d73a4a" };
     // 2 allocations: name, color
