@@ -597,6 +597,99 @@ fn testBothTagsFilter() !void {
     try std.testing.expectEqualStrings("v1.3.0", changelog.releases[2].version);
 }
 
+fn testExcludeLabelsExactMatch() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Reuse the two-release fixture; all test PRs merge before v1.1.0 (2024-01-10).
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_prs_exact_label_match,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    // Only "bug" should be excluded; "bug-fix" and "debug" must survive.
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, "bug");
+    const changelog = try gen.generate(releases, prs);
+    defer gen.deinitChangelog(changelog);
+
+    var found_bug: bool = false;
+    var found_bug_fix: bool = false;
+    var found_debug: bool = false;
+    for (changelog.releases) |release| {
+        for (release.sections) |section| {
+            for (section.entries) |entry| {
+                if (entry.number == 700) found_bug = true;
+                if (entry.number == 701) found_bug_fix = true;
+                if (entry.number == 702) found_debug = true;
+            }
+        }
+    }
+    // PR with exact "bug" label must be excluded.
+    try std.testing.expect(!found_bug);
+    // PRs with "bug-fix" and "debug" labels must NOT be excluded.
+    try std.testing.expect(found_bug_fix);
+    try std.testing.expect(found_debug);
+}
+
+fn testExcludeLabelsCSV() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_prs_csv_labels,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    // Both "bug" and "enhancement" are excluded; "feature" must survive.
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, "bug,enhancement");
+    const changelog = try gen.generate(releases, prs);
+    defer gen.deinitChangelog(changelog);
+
+    var found_bug: bool = false;
+    var found_enhancement: bool = false;
+    var found_feature: bool = false;
+    for (changelog.releases) |release| {
+        for (release.sections) |section| {
+            for (section.entries) |entry| {
+                if (entry.number == 800) found_bug = true;
+                if (entry.number == 801) found_enhancement = true;
+                if (entry.number == 802) found_feature = true;
+            }
+        }
+    }
+    try std.testing.expect(!found_bug);
+    try std.testing.expect(!found_enhancement);
+    try std.testing.expect(found_feature);
+}
+
 fn testTagNotFound() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -702,6 +795,14 @@ pub fn main() !void {
 
     std.debug.print("Running testTagNotFound...\n", .{});
     try testTagNotFound();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testExcludeLabelsExactMatch...\n", .{});
+    try testExcludeLabelsExactMatch();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testExcludeLabelsCSV...\n", .{});
+    try testExcludeLabelsCSV();
     std.debug.print("  PASSED\n", .{});
 
     std.debug.print("\n=== Integration Test with Output ===\n\n", .{});

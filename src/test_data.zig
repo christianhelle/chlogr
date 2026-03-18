@@ -350,6 +350,79 @@ pub const test_releases_four_versions =
     \\]
 ;
 
+// Exact-match exclusion test data.
+// PR #700 has label "bug" → must be excluded when exclude_labels = "bug".
+// PR #701 has label "bug-fix" → must NOT be excluded (substring, not exact match).
+// PR #702 has label "debug" → must NOT be excluded (substring, not exact match).
+// All merged before v1.1.0 (2024-01-10) so they land in a release.
+pub const test_prs_exact_label_match =
+    \\[
+    \\  {
+    \\    "number": 700,
+    \\    "title": "Has exact bug label",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/700",
+    \\    "user": { "login": "alice", "html_url": "https://github.com/alice" },
+    \\    "labels": [{ "name": "bug", "color": "d73a4a" }],
+    \\    "merged_at": "2024-01-09T10:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 701,
+    \\    "title": "Has bug-fix label",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/701",
+    \\    "user": { "login": "bob", "html_url": "https://github.com/bob" },
+    \\    "labels": [{ "name": "bug-fix", "color": "d73a4a" }],
+    \\    "merged_at": "2024-01-09T11:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 702,
+    \\    "title": "Has debug label",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/702",
+    \\    "user": { "login": "charlie", "html_url": "https://github.com/charlie" },
+    \\    "labels": [{ "name": "debug", "color": "e4e669" }],
+    \\    "merged_at": "2024-01-09T12:00:00Z"
+    \\  }
+    \\]
+;
+
+// CSV exclusion test data.
+// PR #800 has label "bug" and PR #801 has label "enhancement" → both excluded by "bug,enhancement".
+// PR #802 has label "feature" → must NOT be excluded.
+// All merged before v1.1.0 (2024-01-10) so they land in a release.
+pub const test_prs_csv_labels =
+    \\[
+    \\  {
+    \\    "number": 800,
+    \\    "title": "CSV bug PR",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/800",
+    \\    "user": { "login": "alice", "html_url": "https://github.com/alice" },
+    \\    "labels": [{ "name": "bug", "color": "d73a4a" }],
+    \\    "merged_at": "2024-01-09T10:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 801,
+    \\    "title": "CSV enhancement PR",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/801",
+    \\    "user": { "login": "bob", "html_url": "https://github.com/bob" },
+    \\    "labels": [{ "name": "enhancement", "color": "84b6eb" }],
+    \\    "merged_at": "2024-01-09T11:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 802,
+    \\    "title": "CSV feature PR",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/802",
+    \\    "user": { "login": "charlie", "html_url": "https://github.com/charlie" },
+    \\    "labels": [{ "name": "feature", "color": "0366d6" }],
+    \\    "merged_at": "2024-01-09T12:00:00Z"
+    \\  }
+    \\]
+;
+
 pub const test_prs_for_four_versions =
     \\[
     \\  {
