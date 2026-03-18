@@ -143,6 +143,7 @@ pub const ChangelogGenerator = struct {
 
         // Sort releases oldest-first so a greedy single pass assigns each PR to the
         // earliest qualifying release, guaranteeing exactly one assignment per PR.
+        // The result is reversed at the end so releases appear newest-first in the output.
         const sorted = try self.allocator.dupe(models.Release, filtered);
         defer self.allocator.free(sorted);
         std.mem.sort(models.Release, sorted, {}, releaseOldestFirst);
@@ -211,6 +212,8 @@ pub const ChangelogGenerator = struct {
 
             result.appendAssumeCapacity(release_entry);
         }
+
+        std.mem.reverse(ChangelogRelease, result.items);
 
         // Collect any PRs not yet assigned to a release into unreleased.
         // Pre-reserve for 3 categories to avoid rehashing.

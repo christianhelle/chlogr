@@ -476,15 +476,15 @@ fn testSinceTagFilter() !void {
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
 
-    // since_tag = v1.2.0 → includes v1.2.0, v1.1.0, v1.0.0; sorted oldest-first in result
+    // since_tag = v1.2.0 → includes v1.2.0, v1.1.0, v1.0.0; sorted newest-first in result
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
     gen.since_tag = "v1.2.0";
     const changelog = try gen.generate(releases, prs);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 3);
-    try std.testing.expectEqualStrings("v1.0.0", changelog.releases[0].version);
-    try std.testing.expectEqualStrings("v1.2.0", changelog.releases[2].version);
+    try std.testing.expectEqualStrings("v1.2.0", changelog.releases[0].version);
+    try std.testing.expectEqualStrings("v1.0.0", changelog.releases[2].version);
 }
 
 // Regression: a PR that qualifies for multiple releases must appear in exactly one
@@ -551,15 +551,15 @@ fn testUntilTagFilter() !void {
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
 
-    // until_tag = v1.2.0 → includes v1.3.0, v1.2.0; sorted oldest-first in result
+    // until_tag = v1.2.0 → includes v1.3.0, v1.2.0; sorted newest-first in result
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
     gen.until_tag = "v1.2.0";
     const changelog = try gen.generate(releases, prs);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 2);
-    try std.testing.expectEqualStrings("v1.2.0", changelog.releases[0].version);
-    try std.testing.expectEqualStrings("v1.3.0", changelog.releases[1].version);
+    try std.testing.expectEqualStrings("v1.3.0", changelog.releases[0].version);
+    try std.testing.expectEqualStrings("v1.2.0", changelog.releases[1].version);
 }
 
 fn testBothTagsFilter() !void {
@@ -585,7 +585,7 @@ fn testBothTagsFilter() !void {
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
 
-    // since_tag = v1.1.0, until_tag = v1.3.0 → includes v1.3.0, v1.2.0, v1.1.0; sorted oldest-first
+    // since_tag = v1.1.0, until_tag = v1.3.0 → includes v1.3.0, v1.2.0, v1.1.0; sorted newest-first
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
     gen.since_tag = "v1.1.0";
     gen.until_tag = "v1.3.0";
@@ -593,8 +593,8 @@ fn testBothTagsFilter() !void {
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 3);
-    try std.testing.expectEqualStrings("v1.1.0", changelog.releases[0].version);
-    try std.testing.expectEqualStrings("v1.3.0", changelog.releases[2].version);
+    try std.testing.expectEqualStrings("v1.3.0", changelog.releases[0].version);
+    try std.testing.expectEqualStrings("v1.1.0", changelog.releases[2].version);
 }
 
 fn testExcludeLabelsExactMatch() !void {
