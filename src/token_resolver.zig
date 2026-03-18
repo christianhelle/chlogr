@@ -91,7 +91,7 @@ pub const TokenResolver = struct {
         var child = std.process.Child.init(&[_][]const u8{ "gh", "auth", "token" }, self.allocator);
 
         child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Pipe;
+        child.stderr_behavior = .Ignore;
 
         try child.spawn();
         defer {
