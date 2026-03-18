@@ -410,6 +410,90 @@ fn testLegacyFormatMethod() !void {
     try std.testing.expect(markdown.len > 0);
 }
 
+// Regression: a PR whose merged_at equals the release's published_at must appear in
+// that release (boundary is inclusive), not in unreleased.
+fn testSameDayMergeHandling() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases_same_day,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_pull_requests_same_day_as_release,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    const changelog = try gen.generate(releases, prs);
+    defer gen.deinitChangelog(changelog);
+
+    try std.testing.expect(changelog.releases.len == 1);
+    try std.testing.expect(changelog.unreleased == null);
+
+    var found_pr = false;
+    for (changelog.releases) |release| {
+        for (release.sections) |section| {
+            for (section.entries) |entry| {
+                if (entry.number == 500) found_pr = true;
+            }
+        }
+    }
+    try std.testing.expect(found_pr);
+}
+
+// Regression: a PR that qualifies for multiple releases must appear in exactly one
+// (the earliest qualifying release), never duplicated.
+fn testNoDuplicateAssignment() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases_two_versions,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_pull_requests_pre_first_release,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    const changelog = try gen.generate(releases, prs);
+    defer gen.deinitChangelog(changelog);
+
+    var total_count: usize = 0;
+    for (changelog.releases) |release| {
+        for (release.sections) |section| {
+            for (section.entries) |entry| {
+                if (entry.number == 600) total_count += 1;
+            }
+        }
+    }
+    try std.testing.expect(total_count == 1);
+    try std.testing.expect(changelog.unreleased == null);
+}
+
 pub fn main() !void {
     std.debug.print("=== Changelog Generator Integration Test ===\n\n", .{});
 
@@ -455,6 +539,14 @@ pub fn main() !void {
 
     std.debug.print("Running testLegacyFormatMethod...\n", .{});
     try testLegacyFormatMethod();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testSameDayMergeHandling...\n", .{});
+    try testSameDayMergeHandling();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testNoDuplicateAssignment...\n", .{});
+    try testNoDuplicateAssignment();
     std.debug.print("  PASSED\n", .{});
 
     std.debug.print("\n=== Integration Test with Output ===\n\n", .{});

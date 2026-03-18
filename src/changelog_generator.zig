@@ -64,49 +64,33 @@ pub const ChangelogGenerator = struct {
         return "Merged Pull Requests";
     }
 
-    fn compareDates(date1: []const u8, date2: []const u8) i32 {
-        const d1 = parseDateToSlice(date1);
-        const d2 = parseDateToSlice(date2);
-        if (d1.len == 0 or d2.len == 0) return 0;
-        return switch (std.mem.order(u8, d1, d2)) {
-            .lt => -1,
-            .eq => 0,
-            .gt => 1,
-        };
+    fn releaseOldestFirst(_: void, a: models.Release, b: models.Release) bool {
+        return std.mem.lessThan(u8, a.published_at, b.published_at);
     }
 
-    fn parseDateToSlice(date_str: []const u8) []const u8 {
-        for (date_str, 0..) |c, i| {
-            if (c == 'T') {
-                return date_str[0..i];
-            }
-        }
-        return date_str;
-    }
-
-    fn isAfter(date_to_check: []const u8, reference_date: []const u8) bool {
-        if (reference_date.len == 0) return true;
-        return compareDates(date_to_check, reference_date) > 0;
-    }
-
-    fn isBefore(date_to_check: []const u8, reference_date: []const u8) bool {
-        return compareDates(date_to_check, reference_date) < 0;
-    }
-
-    /// Generate changelog from releases and PRs
+    /// Generate changelog from releases and PRs.
+    /// Each PR is assigned to exactly one release: the earliest release whose
+    /// published_at >= pr.merged_at (full ISO 8601 lexicographic comparison).
+    /// PRs with no qualifying release go to unreleased.
     pub fn generate(
         self: ChangelogGenerator,
         releases: []models.Release,
         prs: []models.PullRequest,
     ) !Changelog {
-        var result = try std.ArrayList(ChangelogRelease).initCapacity(self.allocator, releases.len);
+        // Sort releases oldest-first so a greedy single pass assigns each PR to the
+        // earliest qualifying release, guaranteeing exactly one assignment per PR.
+        const sorted = try self.allocator.dupe(models.Release, releases);
+        defer self.allocator.free(sorted);
+        std.mem.sort(models.Release, sorted, {}, releaseOldestFirst);
 
-        var last_release_date: []const u8 = "";
-        if (releases.len > 0) {
-            last_release_date = releases[0].published_at;
-        }
+        // Track which PRs have been assigned to prevent duplicate entries.
+        const assigned = try self.allocator.alloc(bool, prs.len);
+        defer self.allocator.free(assigned);
+        @memset(assigned, false);
 
-        for (releases) |release| {
+        var result = try std.ArrayList(ChangelogRelease).initCapacity(self.allocator, sorted.len);
+
+        for (sorted) |release| {
             var sections_map = std.StringHashMap(std.ArrayListUnmanaged(ChangelogEntry)).init(self.allocator);
             defer {
                 var it = sections_map.iterator();
@@ -116,14 +100,14 @@ pub const ChangelogGenerator = struct {
                 sections_map.deinit();
             }
 
-            for (prs) |pr| {
+            for (prs, 0..) |pr, i| {
+                if (assigned[i]) continue;
                 if (self.shouldExclude(pr.labels)) continue;
-                if (pr.merged_at) |merged_at| {
-                    if (!isBefore(merged_at, release.published_at)) continue;
-                } else {
-                    continue;
-                }
+                const merged_at = pr.merged_at orelse continue;
+                // Assign to this release if merged_at <= release.published_at.
+                if (std.mem.order(u8, merged_at, release.published_at) == .gt) continue;
 
+                assigned[i] = true;
                 const category = self.categorizeEntry(pr.labels);
 
                 var gop = try sections_map.getOrPut(category);
@@ -159,12 +143,9 @@ pub const ChangelogGenerator = struct {
             };
 
             result.appendAssumeCapacity(release_entry);
-
-            if (compareDates(release.published_at, last_release_date) > 0) {
-                last_release_date = release.published_at;
-            }
         }
 
+        // Collect any PRs not yet assigned to a release into unreleased.
         var unreleased_sections_map = std.StringHashMap(std.ArrayListUnmanaged(ChangelogEntry)).init(self.allocator);
         defer {
             var it = unreleased_sections_map.iterator();
@@ -175,13 +156,10 @@ pub const ChangelogGenerator = struct {
         }
 
         var has_unreleased = false;
-        for (prs) |pr| {
+        for (prs, 0..) |pr, i| {
+            if (assigned[i]) continue;
             if (self.shouldExclude(pr.labels)) continue;
-            if (pr.merged_at) |merged_at| {
-                if (!isAfter(merged_at, last_release_date)) continue;
-            } else {
-                continue;
-            }
+            if (pr.merged_at == null) continue;
 
             has_unreleased = true;
             const category = self.categorizeEntry(pr.labels);
