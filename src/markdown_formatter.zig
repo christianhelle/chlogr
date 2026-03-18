@@ -34,32 +34,39 @@ pub const MarkdownFormatter = struct {
         releases: []changelog_generator.ChangelogRelease,
         unreleased: ?changelog_generator.UnreleasedChanges,
     ) ![]u8 {
+        const CHANGELOG_HEADER_LEN = 16;
+        const UNRELEASED_HEADER_LEN = 26;
+        const RELEASE_HEADER_BASE_LEN = 52;
+        const SECTION_HEADER_SUFFIX_LEN = 5;
+        const ENTRY_FIXED_CHARS_LEN = 15;
+        const NEWLINE_LEN = 1;
+
         // Estimate final byte size so the buffer rarely needs to grow.
         // "## [<ver>](https://github.com/<repo>/releases/tag/<ver>) (<date>)\n\n"
         // has 52 fixed bytes + version*2 + repo + date.
         // Entry lines: "- <title> ([#<num>](<url>)) (@<author>)\n" ≈ 15 + variable parts.
-        var est: usize = 16; // "# Changelog\n\n"
+        var est: usize = CHANGELOG_HEADER_LEN; // "# Changelog\n\n"
         if (unreleased) |un| {
-            est += 26; // "## [Unreleased Changes]\n\n"
+            est += UNRELEASED_HEADER_LEN; // "## [Unreleased Changes]\n\n"
             for (un.sections) |section| {
-                est += 5 + section.name.len + 1;
+                est += SECTION_HEADER_SUFFIX_LEN + section.name.len + NEWLINE_LEN;
                 for (section.entries) |entry| {
-                    est += 15 + entry.title.len + entry.url.len + entry.author.len;
+                    est += ENTRY_FIXED_CHARS_LEN + entry.title.len + entry.url.len + entry.author.len;
                 }
-                est += 1;
+                est += NEWLINE_LEN;
             }
-            est += 1;
+            est += NEWLINE_LEN;
         }
         for (releases) |release| {
-            est += 52 + release.version.len * 2 + self.repo.len + parseDateToSlice(release.date).len;
+            est += RELEASE_HEADER_BASE_LEN + release.version.len * 2 + self.repo.len + parseDateToSlice(release.date).len;
             for (release.sections) |section| {
-                est += 5 + section.name.len + 1;
+                est += SECTION_HEADER_SUFFIX_LEN + section.name.len + NEWLINE_LEN;
                 for (section.entries) |entry| {
-                    est += 15 + entry.title.len + entry.url.len + entry.author.len;
+                    est += ENTRY_FIXED_CHARS_LEN + entry.title.len + entry.url.len + entry.author.len;
                 }
-                est += 1;
+                est += NEWLINE_LEN;
             }
-            est += 1;
+            est += NEWLINE_LEN;
         }
 
         var buf = try std.ArrayList(u8).initCapacity(self.allocator, est);
