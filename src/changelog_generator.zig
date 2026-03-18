@@ -155,7 +155,10 @@ pub const ChangelogGenerator = struct {
         var result = try std.ArrayList(ChangelogRelease).initCapacity(self.allocator, sorted.len);
 
         for (sorted) |release| {
+            // Only 3 possible categories (Features, Bug Fixes, Merged Pull Requests);
+            // pre-reserve to avoid rehashing during the PR scan.
             var sections_map = std.StringHashMap(std.ArrayListUnmanaged(ChangelogEntry)).init(self.allocator);
+            try sections_map.ensureTotalCapacity(3);
             defer {
                 var it = sections_map.iterator();
                 while (it.next()) |entry| {
@@ -210,7 +213,9 @@ pub const ChangelogGenerator = struct {
         }
 
         // Collect any PRs not yet assigned to a release into unreleased.
+        // Pre-reserve for 3 categories to avoid rehashing.
         var unreleased_sections_map = std.StringHashMap(std.ArrayListUnmanaged(ChangelogEntry)).init(self.allocator);
+        try unreleased_sections_map.ensureTotalCapacity(3);
         defer {
             var it = unreleased_sections_map.iterator();
             while (it.next()) |entry| {
