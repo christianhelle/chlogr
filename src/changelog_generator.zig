@@ -64,24 +64,15 @@ pub const ChangelogGenerator = struct {
         return "Merged Pull Requests";
     }
 
+    /// Compare full ISO-8601 timestamps (preserves time precision)
     fn compareDates(date1: []const u8, date2: []const u8) i32 {
-        const d1 = parseDateToSlice(date1);
-        const d2 = parseDateToSlice(date2);
-        if (d1.len == 0 or d2.len == 0) return 0;
-        return switch (std.mem.order(u8, d1, d2)) {
+        if (date1.len == 0 or date2.len == 0) return 0;
+        // Direct lexicographic comparison works for ISO-8601 format
+        return switch (std.mem.order(u8, date1, date2)) {
             .lt => -1,
             .eq => 0,
             .gt => 1,
         };
-    }
-
-    fn parseDateToSlice(date_str: []const u8) []const u8 {
-        for (date_str, 0..) |c, i| {
-            if (c == 'T') {
-                return date_str[0..i];
-            }
-        }
-        return date_str;
     }
 
     fn isAfter(date_to_check: []const u8, reference_date: []const u8) bool {
@@ -89,8 +80,8 @@ pub const ChangelogGenerator = struct {
         return compareDates(date_to_check, reference_date) > 0;
     }
 
-    fn isBefore(date_to_check: []const u8, reference_date: []const u8) bool {
-        return compareDates(date_to_check, reference_date) < 0;
+    fn isBeforeOrEqual(date_to_check: []const u8, reference_date: []const u8) bool {
+        return compareDates(date_to_check, reference_date) <= 0;
     }
 
     /// Generate changelog from releases and PRs
@@ -99,14 +90,31 @@ pub const ChangelogGenerator = struct {
         releases: []models.Release,
         prs: []models.PullRequest,
     ) !Changelog {
-        var result = try std.ArrayList(ChangelogRelease).initCapacity(self.allocator, releases.len);
-
-        var last_release_date: []const u8 = "";
-        if (releases.len > 0) {
-            last_release_date = releases[0].published_at;
+        // Sort releases by published_at (newest first) for correct assignment
+        const sorted_releases = try self.allocator.alloc(models.Release, releases.len);
+        defer self.allocator.free(sorted_releases);
+        @memcpy(sorted_releases, releases);
+        
+        // Bubble sort (simple and correct for small arrays)
+        for (0..sorted_releases.len) |i| {
+            for (i + 1..sorted_releases.len) |j| {
+                if (compareDates(sorted_releases[i].published_at, sorted_releases[j].published_at) < 0) {
+                    const tmp = sorted_releases[i];
+                    sorted_releases[i] = sorted_releases[j];
+                    sorted_releases[j] = tmp;
+                }
+            }
         }
 
-        for (releases) |release| {
+        var result = try std.ArrayList(ChangelogRelease).initCapacity(self.allocator, sorted_releases.len);
+
+        var last_release_date: []const u8 = "";
+        if (sorted_releases.len > 0) {
+            last_release_date = sorted_releases[0].published_at;
+        }
+
+        // Process each release in sorted order (newest to oldest)
+        for (sorted_releases) |release| {
             var sections_map = std.StringHashMap(std.ArrayList(ChangelogEntry)).init(self.allocator);
             defer {
                 var it = sections_map.iterator();
@@ -119,7 +127,9 @@ pub const ChangelogGenerator = struct {
             for (prs) |pr| {
                 if (self.shouldExclude(pr.labels)) continue;
                 if (pr.merged_at) |merged_at| {
-                    if (!isBefore(merged_at, release.published_at)) continue;
+                    // PR belongs to this release if merged_at <= published_at
+                    // Use <= to include PRs merged at exact release time
+                    if (!isBeforeOrEqual(merged_at, release.published_at)) continue;
                 } else {
                     continue;
                 }
@@ -159,10 +169,6 @@ pub const ChangelogGenerator = struct {
             };
 
             result.appendAssumeCapacity(release_entry);
-
-            if (compareDates(release.published_at, last_release_date) > 0) {
-                last_release_date = release.published_at;
-            }
         }
 
         var unreleased_sections_map = std.StringHashMap(std.ArrayList(ChangelogEntry)).init(self.allocator);
@@ -178,6 +184,7 @@ pub const ChangelogGenerator = struct {
         for (prs) |pr| {
             if (self.shouldExclude(pr.labels)) continue;
             if (pr.merged_at) |merged_at| {
+                // PRs merged after the latest release go to unreleased
                 if (!isAfter(merged_at, last_release_date)) continue;
             } else {
                 continue;
