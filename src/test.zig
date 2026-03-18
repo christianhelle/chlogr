@@ -453,6 +453,40 @@ fn testSameDayMergeHandling() !void {
     try std.testing.expect(found_pr);
 }
 
+fn testSinceTagFilter() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases_four_versions,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_prs_for_four_versions,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    // since_tag = v1.2.0 → includes v1.2.0, v1.1.0, v1.0.0; sorted oldest-first in result
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    gen.since_tag = "v1.2.0";
+    const changelog = try gen.generate(releases, prs);
+    defer gen.deinitChangelog(changelog);
+
+    try std.testing.expect(changelog.releases.len == 3);
+    try std.testing.expectEqualStrings("v1.0.0", changelog.releases[0].version);
+    try std.testing.expectEqualStrings("v1.2.0", changelog.releases[2].version);
+}
+
 // Regression: a PR that qualifies for multiple releases must appear in exactly one
 // (the earliest qualifying release), never duplicated.
 fn testNoDuplicateAssignment() !void {
@@ -492,6 +526,111 @@ fn testNoDuplicateAssignment() !void {
     }
     try std.testing.expect(total_count == 1);
     try std.testing.expect(changelog.unreleased == null);
+}
+
+fn testUntilTagFilter() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases_four_versions,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_prs_for_four_versions,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    // until_tag = v1.2.0 → includes v1.3.0, v1.2.0; sorted oldest-first in result
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    gen.until_tag = "v1.2.0";
+    const changelog = try gen.generate(releases, prs);
+    defer gen.deinitChangelog(changelog);
+
+    try std.testing.expect(changelog.releases.len == 2);
+    try std.testing.expectEqualStrings("v1.2.0", changelog.releases[0].version);
+    try std.testing.expectEqualStrings("v1.3.0", changelog.releases[1].version);
+}
+
+fn testBothTagsFilter() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases_four_versions,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_prs_for_four_versions,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    // since_tag = v1.1.0, until_tag = v1.3.0 → includes v1.3.0, v1.2.0, v1.1.0; sorted oldest-first
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    gen.since_tag = "v1.1.0";
+    gen.until_tag = "v1.3.0";
+    const changelog = try gen.generate(releases, prs);
+    defer gen.deinitChangelog(changelog);
+
+    try std.testing.expect(changelog.releases.len == 3);
+    try std.testing.expectEqualStrings("v1.1.0", changelog.releases[0].version);
+    try std.testing.expectEqualStrings("v1.3.0", changelog.releases[2].version);
+}
+
+fn testTagNotFound() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases_four_versions,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_prs_for_four_versions,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    // since_tag that doesn't exist → error.SinceTagNotFound
+    var gen_since = changelog_generator.ChangelogGenerator.init(allocator, null);
+    gen_since.since_tag = "v9.9.9";
+    const result_since = gen_since.generate(releases, prs);
+    try std.testing.expectError(error.SinceTagNotFound, result_since);
+
+    // until_tag that doesn't exist → error.UntilTagNotFound
+    var gen_until = changelog_generator.ChangelogGenerator.init(allocator, null);
+    gen_until.until_tag = "v9.9.9";
+    const result_until = gen_until.generate(releases, prs);
+    try std.testing.expectError(error.UntilTagNotFound, result_until);
 }
 
 pub fn main() !void {
@@ -547,6 +686,22 @@ pub fn main() !void {
 
     std.debug.print("Running testNoDuplicateAssignment...\n", .{});
     try testNoDuplicateAssignment();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testSinceTagFilter...\n", .{});
+    try testSinceTagFilter();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testUntilTagFilter...\n", .{});
+    try testUntilTagFilter();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testBothTagsFilter...\n", .{});
+    try testBothTagsFilter();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testTagNotFound...\n", .{});
+    try testTagNotFound();
     std.debug.print("  PASSED\n", .{});
 
     std.debug.print("\n=== Integration Test with Output ===\n\n", .{});
