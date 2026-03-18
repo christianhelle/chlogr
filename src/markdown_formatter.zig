@@ -26,106 +26,80 @@ pub const MarkdownFormatter = struct {
         return self.formatWithUnreleased(releases, null);
     }
 
-    /// Format changelog releases and unreleased changes to Markdown string
+    /// Format changelog releases and unreleased changes to Markdown string.
+    /// Writes all output directly into a single growing buffer, eliminating the
+    /// per-fragment heap allocations that the previous parts-list approach required.
     pub fn formatWithUnreleased(
         self: MarkdownFormatter,
         releases: []changelog_generator.ChangelogRelease,
         unreleased: ?changelog_generator.UnreleasedChanges,
     ) ![]u8 {
-        var total_items: usize = 1;
+        // Estimate final byte size so the buffer rarely needs to grow.
+        // "## [<ver>](https://github.com/<repo>/releases/tag/<ver>) (<date>)\n\n"
+        // has 52 fixed bytes + version*2 + repo + date.
+        // Entry lines: "- <title> ([#<num>](<url>)) (@<author>)\n" ≈ 15 + variable parts.
+        var est: usize = 16; // "# Changelog\n\n"
         if (unreleased) |un| {
-            total_items += 1;
+            est += 26; // "## [Unreleased Changes]\n\n"
             for (un.sections) |section| {
-                total_items += 1;
-                total_items += section.entries.len;
-                total_items += 1;
+                est += 5 + section.name.len + 1;
+                for (section.entries) |entry| {
+                    est += 15 + entry.title.len + entry.url.len + entry.author.len;
+                }
+                est += 1;
             }
-            total_items += 1;
+            est += 1;
         }
         for (releases) |release| {
-            total_items += 1;
+            est += 52 + release.version.len * 2 + self.repo.len + parseDateToSlice(release.date).len;
             for (release.sections) |section| {
-                total_items += 1;
-                total_items += section.entries.len;
-                total_items += 1;
+                est += 5 + section.name.len + 1;
+                for (section.entries) |entry| {
+                    est += 15 + entry.title.len + entry.url.len + entry.author.len;
+                }
+                est += 1;
             }
-            total_items += 1;
+            est += 1;
         }
 
-        var parts = try std.ArrayList([]u8).initCapacity(self.allocator, total_items + 20);
-        defer parts.deinit(self.allocator);
+        var buf = try std.ArrayList(u8).initCapacity(self.allocator, est);
+        errdefer buf.deinit(self.allocator);
+        const writer = buf.writer(self.allocator);
 
-        try parts.append(self.allocator, try self.allocator.dupe(u8, "# Changelog\n\n"));
+        try writer.writeAll("# Changelog\n\n");
 
         if (unreleased) |un| {
-            try parts.append(self.allocator, try self.allocator.dupe(u8, "## [Unreleased Changes]\n\n"));
-
+            try writer.writeAll("## [Unreleased Changes]\n\n");
             for (un.sections) |section| {
-                const section_header = try std.fmt.allocPrint(self.allocator, "### {s}\n", .{section.name});
-                try parts.append(self.allocator, section_header);
-
+                try writer.print("### {s}\n", .{section.name});
                 for (section.entries) |entry| {
-                    const entry_line = try std.fmt.allocPrint(self.allocator, "- {s} ([#{d}]({s})) (@{s})\n", .{
-                        entry.title,
-                        entry.number,
-                        entry.url,
-                        entry.author,
+                    try writer.print("- {s} ([#{d}]({s})) (@{s})\n", .{
+                        entry.title, entry.number, entry.url, entry.author,
                     });
-                    try parts.append(self.allocator, entry_line);
                 }
-
-                try parts.append(self.allocator, try self.allocator.dupe(u8, "\n"));
+                try writer.writeByte('\n');
             }
-
-            try parts.append(self.allocator, try self.allocator.dupe(u8, "\n"));
+            try writer.writeByte('\n');
         }
 
         for (releases) |release| {
             const date_only = parseDateToSlice(release.date);
-            const header = try std.fmt.allocPrint(self.allocator, "## [{s}](https://github.com/{s}/releases/tag/{s}) ({s})\n\n", .{
-                release.version,
-                self.repo,
-                release.version,
-                date_only,
+            try writer.print("## [{s}](https://github.com/{s}/releases/tag/{s}) ({s})\n\n", .{
+                release.version, self.repo, release.version, date_only,
             });
-            try parts.append(self.allocator, header);
-
             for (release.sections) |section| {
-                const section_header = try std.fmt.allocPrint(self.allocator, "### {s}\n", .{section.name});
-                try parts.append(self.allocator, section_header);
-
+                try writer.print("### {s}\n", .{section.name});
                 for (section.entries) |entry| {
-                    const entry_line = try std.fmt.allocPrint(self.allocator, "- {s} ([#{d}]({s})) (@{s})\n", .{
-                        entry.title,
-                        entry.number,
-                        entry.url,
-                        entry.author,
+                    try writer.print("- {s} ([#{d}]({s})) (@{s})\n", .{
+                        entry.title, entry.number, entry.url, entry.author,
                     });
-                    try parts.append(self.allocator, entry_line);
                 }
-
-                try parts.append(self.allocator, try self.allocator.dupe(u8, "\n"));
+                try writer.writeByte('\n');
             }
-
-            try parts.append(self.allocator, try self.allocator.dupe(u8, "\n"));
+            try writer.writeByte('\n');
         }
 
-        // Calculate total length
-        var total_len: usize = 0;
-        for (parts.items) |part| {
-            total_len += part.len;
-        }
-
-        // Allocate result and concatenate
-        var result = try self.allocator.alloc(u8, total_len);
-        var offset: usize = 0;
-        for (parts.items) |part| {
-            @memcpy(result[offset .. offset + part.len], part);
-            offset += part.len;
-            self.allocator.free(part);
-        }
-
-        return result;
+        return buf.toOwnedSlice(self.allocator);
     }
 
     /// Write Markdown to file
