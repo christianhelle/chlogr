@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const VERSION = "0.1.0";
+pub const VERSION = "0.2.5";
 
 pub const CliArgs = struct {
     repo: ?[]const u8 = null,

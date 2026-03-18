@@ -1,6 +1,6 @@
 name: chlogr
 base: core22
-version: 0.1.4
+version: 0.2.5
 title: Changelog Generator
 summary: Generate changelogs from GitHub tags, pull requests, and issues
 license: MIT
