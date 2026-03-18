@@ -269,7 +269,7 @@ fn testMarkdownFormatterWithUnreleased() !void {
     const changelog = try gen.generate(releases, prs);
     defer gen.deinitChangelog(changelog);
 
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator);
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, "testowner/testrepo");
     const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
     defer formatter.deinit(markdown);
 
@@ -305,7 +305,7 @@ fn testMarkdownFormatterWithoutUnreleased() !void {
     const changelog = try gen.generate(releases, prs);
     defer gen.deinitChangelog(changelog);
 
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator);
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, "testowner/testrepo");
     const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
     defer formatter.deinit(markdown);
 
@@ -403,7 +403,7 @@ fn testLegacyFormatMethod() !void {
     const changelog = try gen.generate(releases, prs);
     defer gen.deinitChangelog(changelog);
 
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator);
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, "testowner/testrepo");
     const markdown = try formatter.format(changelog.releases);
     defer formatter.deinit(markdown);
 
@@ -726,6 +726,44 @@ fn testTagNotFound() !void {
     try std.testing.expectError(error.UntilTagNotFound, result_until);
 }
 
+fn testRepoSlugInReleaseLinks() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_pull_requests,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    const changelog = try gen.generate(releases, prs);
+    defer gen.deinitChangelog(changelog);
+
+    const repo_slug = "myorg/myrepo";
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, repo_slug);
+    const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
+    defer formatter.deinit(markdown);
+
+    // Release links must contain the provided repo slug
+    try std.testing.expect(std.mem.indexOf(u8, markdown, "https://github.com/myorg/myrepo/releases/tag/") != null);
+    // Hardcoded placeholder must not appear in release header links
+    try std.testing.expect(std.mem.indexOf(u8, markdown, "https://github.com/owner/repo/releases/tag/") == null);
+}
+
 pub fn main() !void {
     std.debug.print("=== Changelog Generator Integration Test ===\n\n", .{});
 
@@ -805,6 +843,10 @@ pub fn main() !void {
     try testExcludeLabelsCSV();
     std.debug.print("  PASSED\n", .{});
 
+    std.debug.print("Running testRepoSlugInReleaseLinks...\n", .{});
+    try testRepoSlugInReleaseLinks();
+    std.debug.print("  PASSED\n", .{});
+
     std.debug.print("\n=== Integration Test with Output ===\n\n", .{});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -865,7 +907,7 @@ pub fn main() !void {
     }
 
     std.debug.print("\nFormatting to Markdown...\n", .{});
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator);
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, "testowner/testrepo");
     const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
     defer formatter.deinit(markdown);
 
