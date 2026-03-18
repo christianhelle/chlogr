@@ -114,6 +114,7 @@ pub const GitHubApiClient = struct {
         }
 
         while (true) {
+            std.debug.print("  Fetching releases page {d}...\r", .{page});
             const endpoint = try std.fmt.allocPrint(self.allocator, "/repos/{s}/releases?page={d}&per_page={d}", .{ self.repo, page, per_page });
             defer self.allocator.free(endpoint);
 
@@ -140,6 +141,7 @@ pub const GitHubApiClient = struct {
             if (page_count < per_page) break;
             page += 1;
         }
+        std.debug.print("\n", .{});
 
         return try all_releases.toOwnedSlice(self.allocator);
     }
@@ -167,6 +169,7 @@ pub const GitHubApiClient = struct {
         }
 
         while (true) {
+            std.debug.print("  Fetching pull requests page {d}...\r", .{page});
             const endpoint = try std.fmt.allocPrint(self.allocator, "/repos/{s}/pulls?state=closed&page={d}&per_page={d}&sort=updated&direction=desc", .{ self.repo, page, per_page });
             defer self.allocator.free(endpoint);
 
@@ -193,6 +196,7 @@ pub const GitHubApiClient = struct {
             if (page_count < per_page) break;
             page += 1;
         }
+        std.debug.print("\n", .{});
 
         return try all_prs.toOwnedSlice(self.allocator);
     }
