@@ -49,3 +49,41 @@ src/
 - Rebase required: `test_data.zig` and `test.zig` both had non-overlapping additions from PR #19; resolved cleanly with `git worktree` isolation.
 - Tag-filter test expectations updated to reflect oldest-first ordering in `changelog.releases[]` (a consequence of PR #19's sort approach).
 - 17 tests; all pass.
+
+## PR #35 Review — Wire `--parallel` into `main.zig` (`feature/30-wire-parallel-main`)
+
+**Review verdict:** Approved and merged (squash). Closes #30.  
+**Key observations:**
+- Only `src/main.zig` modified (+35/−16) — correct scope.
+- Labeled block pattern (`blk:` + `break :blk`) assigns `FetchedData` struct from either the parallel or sequential path. Idiomatic Zig for if/else expressions producing a value.
+- `--parallel` true → `ParallelFetcher.init()` + `fetch()` called; false (default) → existing sequential `getReleases()` + `getMergedPullRequests()`.
+- Memory ownership is clean: `freeReleases()` and `freePullRequests()` only use `self.allocator` (not the HTTP client), so they're safe to call on data fetched by `ParallelFetcher` since both paths share the same GPA allocator.
+- Single `defer` per free call after the if/else block — no double-free risk.
+- Error handling on parallel path mirrors the sequential style (descriptive messages + return err).
+- CI green on all 3 platforms (ubuntu, macOS, windows); local build passes; all 20 tests pass.
+- #31 (parallel progress polish) remains as the final step.
+
+## PR #36 Review — Per-fetcher progress in parallel mode (`feature/31-parallel-progress`)
+
+**Review verdict:** Approved and merged (squash). Closes #31.  
+**Key observations:**
+- Only `src/github_api.zig` modified (+2/−4) — minimal, correct scope.
+- `\r` replaced with `\n` in per-page progress prints in both `getReleases()` and `getMergedPullRequests()` pagination loops.
+- Trailing cleanup `std.debug.print("\n", .{})` after each loop correctly removed — no longer needed since each line self-terminates with `\n`.
+- `\n` is safe for concurrent writers (no garbled output) and works in CI/CD environments where `\r` may not render.
+- Trade-off: slightly more verbose sequential output (each page on its own line). Acceptable.
+- Build passes; all 20 tests pass.
+
+## Parallel Fetch Series — Complete ✅
+
+All 5 issues (#27–#31) shipped via PRs #32–#36:
+
+| PR | Issue | Summary |
+|----|-------|---------|
+| #32 | #27 | `ParallelFetcher` struct with thread-based concurrent fetching |
+| #33 | #28 | Thread-safe error handling in `ParallelFetcher` |
+| #34 | #29 | `--parallel` CLI flag in `cli.zig` |
+| #35 | #30 | Wire `--parallel` into `main.zig` orchestration |
+| #36 | #31 | Fix progress output for parallel mode (`\r` → `\n`) |
+
+chlogr now supports `--parallel` for concurrent GitHub API data fetching. Sequential mode (default) unchanged. Series complete.
