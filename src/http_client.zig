@@ -3,6 +3,7 @@ const std = @import("std");
 pub const HttpResponse = struct {
     status: std.http.Status,
     body: []u8,
+    link_header: ?[]u8 = null,
 };
 
 pub const HttpClient = struct {
@@ -65,9 +66,20 @@ pub const HttpClient = struct {
         var list = body.toArrayList();
         const owned_body = try list.toOwnedSlice(self.allocator);
 
+        // Extract Link header for pagination
+        var link_header: ?[]u8 = null;
+        var header_it = result.headers.iterator();
+        while (header_it.next()) |header| {
+            if (std.ascii.eqlIgnoreCase(header.name, "link")) {
+                link_header = try self.allocator.dupe(u8, header.value);
+                break;
+            }
+        }
+
         return HttpResponse{
             .status = result.status,
             .body = owned_body,
+            .link_header = link_header,
         };
     }
 

@@ -124,3 +124,68 @@ defer items.deinit(allocator);
 2. **Process handling:** Token resolution can hang if stderr fills or gh exits abnormally.
 3. **Silent correctness bugs:** Release assignment and label exclusion can fail silently; wrong changelog looks valid.
 4. **Feature scope:** #8 (since/until tags) advertised but unimplemented; must decide now or remove.
+
+---
+
+## P0 Merge Review (2026-03-18)
+
+### Decision: APPROVED ✅
+
+P0 fixes (#3, #4) merged to main. All tests passing, fixes are sound and production-ready.
+
+### Code Review Findings
+
+**Issue #3 Fix (ArrayList Safety):**
+- **Before:** `catch continue` swallowed errors, `initCapacity()` pre-allocated memory that may never be used
+- **After:** `try` propagates errors properly, `ArrayList.empty` initializes without allocation
+- **Pattern:** Using `.empty` is safer when final size unknown; reduces allocator pressure
+- **Test Coverage:** Comprehensive failing allocator tests validate correct error propagation
+
+**Issue #4 Fix (Token Resolution):**
+- **Before:** Direct union field access `.Exited` without variant check, stderr piped but never drained (deadlock risk)
+- **After:** Explicit `switch` on all termination cases, stderr ignored entirely
+- **Pattern:** Always use exhaustive switch on process termination; ignore stderr when output not needed
+- **Test Coverage:** Process edge cases (abnormal exit, signal, deadlock) all validated
+
+### Key Learnings
+
+1. **ArrayList.empty vs initCapacity:** When exact size is unknown or variable, prefer `.empty` initialization. Only use `initCapacity()` when size is known upfront and all elements will be added.
+
+2. **Process stderr handling:** If stderr output is not needed, use `.Ignore` instead of `.Pipe` to avoid deadlock on full pipe buffer. Only pipe when you need to read the output.
+
+3. **Union variant safety:** Never access union fields directly (e.g., `term.Exited`). Always use exhaustive switch to handle all cases. This prevents crashes on unexpected variants.
+
+4. **Error propagation vs catch-continue:** Using `catch continue` in critical paths silently swallows errors and can lead to undefined behavior. Use `try` for propagation or explicit error handling with logged diagnostics.
+
+5. **Test-driven safety fixes:** The failing allocator tests and process edge-case tests were critical to validating the fixes. Without them, we'd have no evidence the bugs were actually resolved.
+
+### P1 Priorities
+
+With P0 complete, P1 work can proceed in parallel:
+
+**Immediate Start (Parallel):**
+- #6 (allocation cleanup) — Similar patterns to #3, add errdefer to API client
+- #9 (label parsing) — CSV tokenization, whitespace handling
+- #5 (timestamp semantics) — Full ISO-8601 comparison, affects #7
+- #8 (tag rejection) — Product scope decision, add validation
+- #10 (release links) — Formatter fix, pass repo slug
+
+**After #5:**
+- #7 (pagination) — Should use corrected timestamp semantics for tests
+
+### Code Quality Observations
+
+**Strong Patterns:**
+- Minimal, surgical changes focused on root cause
+- No scope creep or over-engineering
+- Excellent test coverage for edge cases
+- Clear error propagation paths
+
+**Watch For (P1):**
+- Timestamp comparison changes (#5) will touch similar loops; ensure no regressions
+- Pagination (#7) adds complexity; test thoroughly with large datasets
+- Label parsing (#9) needs careful CSV tokenization; edge cases around whitespace, empty tokens
+
+### Next Focus
+
+**Gate Status:** P1 cleared for launch. Fenster, McManus, Scribe can begin parallel work immediately. Hockney should coordinate with McManus on #5 completion before finalizing #7 tests.
