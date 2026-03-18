@@ -25,18 +25,13 @@ zig build
 ### Basic Usage
 
 ```bash
-./zig-out/bin/chlogr \
-  --repo github/cli \
-  --output CHANGELOG.md
+chlogr --repo [org]/[repo]
 ```
 
 ### With Token
 
 ```bash
-./zig-out/bin/chlogr \
-  --repo github/cli \
-  --token ghp_xxxxxxxxxxxx \
-  --output CHANGELOG.md
+chlogr --repo [org]/[repo] --token ghp_xxxxxxxxxxxx
 ```
 
 ### Options
