@@ -57,3 +57,38 @@ Tag filtering is implemented as a pre-processing step inside `ChangelogGenerator
 - Callers set them directly after `init`: `gen.since_tag = parsed_args.since_tag;`
 - Unknown tags return typed errors (`SinceTagNotFound` / `UntilTagNotFound`) rather than silent empty results; `main.zig` prints a clear diagnostic before propagating the error.
 - The filter returns a slice of the original releases array — no allocation required.
+
+---
+
+## Wave 2 session — P1 issues #9, #10, #11 (PRs #22, #23, #24)
+
+### Issue #9 — Exact CSV token matching for --exclude-labels (PR #22)
+
+**Approach used:**  
+Replaced the previous `std.mem.indexOf`-based substring check with exact token matching via `std.mem.splitScalar(',')` + `std.mem.trim` + `std.mem.eql`. Each label in the PR is tested against each trimmed CSV token individually.
+
+**Key decisions:**
+- `splitScalar(',')` is the correct Zig 0.15.2 API for single-delimiter splitting (not `split` which requires a sequence).
+- `trim` is applied to both whitespace characters on each token to handle `"bug, enhancement"` style user input.
+- `eql` for exact match prevents false positives like `"bug"` matching `"debug"`.
+- 19 tests pass, including new cases that verify substring non-matching.
+
+### Issue #10 — Dynamic repo slug in release header URLs (PR #23)
+
+**Approach used:**  
+`MarkdownFormatter` was changed from a zero-field struct to a struct holding a `repo: []const u8` field. `init` now accepts a `repo` parameter. Release header links are rendered as `https://github.com/{repo}/releases/tag/{tag}` using the runtime value.
+
+**Key decisions:**
+- `MarkdownFormatter.init(allocator, repo)` — `allocator` retained for future use, `repo` stored by slice (no copy needed; owned by caller for the formatter's lifetime).
+- All call sites in `main.zig` and tests updated to pass `repo`.
+- 20 tests pass.
+
+### Issue #11 — Reduce allocation churn (PR #24)
+
+**Approach used:**  
+`markdown_formatter.zig` switched from multiple `std.fmt.allocPrint` calls (one per fragment) to a single `ArrayList(u8)` writer pattern: `var buf = ArrayList(u8).init(allocator)` → `buf.writer()` → `std.fmt.format(writer, ...)` for each fragment → `buf.toOwnedSlice()` once at the end. `changelog_generator.zig` calls `ensureTotalCapacity(3)` on the per-release PR `AutoHashMap`s immediately after creation, amortising the first few inserts.
+
+**Key decisions:**
+- `ArrayList(u8).writer()` returns a `std.io.Writer` compatible with `std.fmt.format` — this is the idiomatic Zig pattern for building strings without repeated allocations.
+- `ensureTotalCapacity` on a hash map takes an `Allocator` in Zig 0.15.2 (`try map.ensureTotalCapacity(allocator, 3)`).
+- 20 tests continue to pass — the refactor is behaviour-preserving.
