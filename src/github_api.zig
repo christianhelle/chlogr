@@ -2,6 +2,90 @@ const std = @import("std");
 const http_client = @import("http_client.zig");
 const models = @import("models.zig");
 
+fn copyLabel(allocator: std.mem.Allocator, src: models.Label) !models.Label {
+    const name = try allocator.dupe(u8, src.name);
+    errdefer allocator.free(name);
+    const color = try allocator.dupe(u8, src.color);
+    return .{ .name = name, .color = color };
+}
+
+fn copyLabels(allocator: std.mem.Allocator, src: []const models.Label) ![]models.Label {
+    var list = try std.ArrayList(models.Label).initCapacity(allocator, src.len);
+    errdefer {
+        for (list.items) |l| {
+            allocator.free(l.name);
+            allocator.free(l.color);
+        }
+        list.deinit(allocator);
+    }
+    for (src) |label| {
+        list.appendAssumeCapacity(try copyLabel(allocator, label));
+    }
+    return try list.toOwnedSlice(allocator);
+}
+
+fn copyRelease(allocator: std.mem.Allocator, src: models.Release) !models.Release {
+    const tag_name = try allocator.dupe(u8, src.tag_name);
+    errdefer allocator.free(tag_name);
+    const name = try allocator.dupe(u8, src.name);
+    errdefer allocator.free(name);
+    const published_at = try allocator.dupe(u8, src.published_at);
+    return .{ .tag_name = tag_name, .name = name, .published_at = published_at };
+}
+
+fn copyPullRequest(allocator: std.mem.Allocator, src: models.PullRequest) !models.PullRequest {
+    const title = try allocator.dupe(u8, src.title);
+    errdefer allocator.free(title);
+    const body: ?[]const u8 = if (src.body) |b| try allocator.dupe(u8, b) else null;
+    errdefer if (body) |b| allocator.free(b);
+    const html_url = try allocator.dupe(u8, src.html_url);
+    errdefer allocator.free(html_url);
+    const user_login = try allocator.dupe(u8, src.user.login);
+    errdefer allocator.free(user_login);
+    const user_html_url = try allocator.dupe(u8, src.user.html_url);
+    errdefer allocator.free(user_html_url);
+    const labels = try copyLabels(allocator, src.labels);
+    errdefer {
+        for (labels) |l| {
+            allocator.free(l.name);
+            allocator.free(l.color);
+        }
+        allocator.free(labels);
+    }
+    const merged_at: ?[]const u8 = if (src.merged_at) |m| try allocator.dupe(u8, m) else null;
+    return .{
+        .number = src.number,
+        .title = title,
+        .body = body,
+        .html_url = html_url,
+        .user = .{ .login = user_login, .html_url = user_html_url },
+        .labels = labels,
+        .merged_at = merged_at,
+    };
+}
+
+fn copyIssue(allocator: std.mem.Allocator, src: models.Issue) !models.Issue {
+    const title = try allocator.dupe(u8, src.title);
+    errdefer allocator.free(title);
+    const body: ?[]const u8 = if (src.body) |b| try allocator.dupe(u8, b) else null;
+    errdefer if (body) |b| allocator.free(b);
+    const html_url = try allocator.dupe(u8, src.html_url);
+    errdefer allocator.free(html_url);
+    const user_login = try allocator.dupe(u8, src.user.login);
+    errdefer allocator.free(user_login);
+    const user_html_url = try allocator.dupe(u8, src.user.html_url);
+    errdefer allocator.free(user_html_url);
+    const labels = try copyLabels(allocator, src.labels);
+    return .{
+        .number = src.number,
+        .title = title,
+        .body = body,
+        .html_url = html_url,
+        .user = .{ .login = user_login, .html_url = user_html_url },
+        .labels = labels,
+    };
+}
+
 pub const GitHubApiClient = struct {
     allocator: std.mem.Allocator,
     http_client: http_client.HttpClient,
@@ -38,12 +122,16 @@ pub const GitHubApiClient = struct {
 
         // Deep copy releases with string duplication
         var releases = try std.ArrayList(models.Release).initCapacity(self.allocator, parsed.value.len);
+        errdefer {
+            for (releases.items) |r| {
+                self.allocator.free(r.tag_name);
+                self.allocator.free(r.name);
+                self.allocator.free(r.published_at);
+            }
+            releases.deinit(self.allocator);
+        }
         for (parsed.value) |release| {
-            releases.appendAssumeCapacity(.{
-                .tag_name = try self.allocator.dupe(u8, release.tag_name),
-                .name = try self.allocator.dupe(u8, release.name),
-                .published_at = try self.allocator.dupe(u8, release.published_at),
-            });
+            releases.appendAssumeCapacity(try copyRelease(self.allocator, release));
         }
         return try releases.toOwnedSlice(self.allocator);
     }
@@ -70,28 +158,24 @@ pub const GitHubApiClient = struct {
 
         // Deep copy PRs with string and struct duplication
         var prs = try std.ArrayList(models.PullRequest).initCapacity(self.allocator, parsed.value.len);
-        for (parsed.value) |pr| {
-            // Copy labels
-            var labels = try std.ArrayList(models.Label).initCapacity(self.allocator, pr.labels.len);
-            for (pr.labels) |label| {
-                labels.appendAssumeCapacity(.{
-                    .name = try self.allocator.dupe(u8, label.name),
-                    .color = try self.allocator.dupe(u8, label.color),
-                });
+        errdefer {
+            for (prs.items) |pr| {
+                self.allocator.free(pr.title);
+                if (pr.body) |b| self.allocator.free(b);
+                self.allocator.free(pr.html_url);
+                self.allocator.free(pr.user.login);
+                self.allocator.free(pr.user.html_url);
+                for (pr.labels) |l| {
+                    self.allocator.free(l.name);
+                    self.allocator.free(l.color);
+                }
+                self.allocator.free(pr.labels);
+                if (pr.merged_at) |m| self.allocator.free(m);
             }
-
-            prs.appendAssumeCapacity(.{
-                .number = pr.number,
-                .title = try self.allocator.dupe(u8, pr.title),
-                .body = if (pr.body) |body| try self.allocator.dupe(u8, body) else null,
-                .html_url = try self.allocator.dupe(u8, pr.html_url),
-                .user = .{
-                    .login = try self.allocator.dupe(u8, pr.user.login),
-                    .html_url = try self.allocator.dupe(u8, pr.user.html_url),
-                },
-                .labels = try labels.toOwnedSlice(self.allocator),
-                .merged_at = if (pr.merged_at) |merged| try self.allocator.dupe(u8, merged) else null,
-            });
+            prs.deinit(self.allocator);
+        }
+        for (parsed.value) |pr| {
+            prs.appendAssumeCapacity(try copyPullRequest(self.allocator, pr));
         }
         return try prs.toOwnedSlice(self.allocator);
     }
@@ -118,27 +202,23 @@ pub const GitHubApiClient = struct {
 
         // Deep copy Issues with string and struct duplication
         var issues = try std.ArrayList(models.Issue).initCapacity(self.allocator, parsed.value.len);
-        for (parsed.value) |issue| {
-            // Copy labels
-            var labels = try std.ArrayList(models.Label).initCapacity(self.allocator, issue.labels.len);
-            for (issue.labels) |label| {
-                labels.appendAssumeCapacity(.{
-                    .name = try self.allocator.dupe(u8, label.name),
-                    .color = try self.allocator.dupe(u8, label.color),
-                });
+        errdefer {
+            for (issues.items) |issue| {
+                self.allocator.free(issue.title);
+                if (issue.body) |b| self.allocator.free(b);
+                self.allocator.free(issue.html_url);
+                self.allocator.free(issue.user.login);
+                self.allocator.free(issue.user.html_url);
+                for (issue.labels) |l| {
+                    self.allocator.free(l.name);
+                    self.allocator.free(l.color);
+                }
+                self.allocator.free(issue.labels);
             }
-
-            issues.appendAssumeCapacity(.{
-                .number = issue.number,
-                .title = try self.allocator.dupe(u8, issue.title),
-                .body = if (issue.body) |body| try self.allocator.dupe(u8, body) else null,
-                .html_url = try self.allocator.dupe(u8, issue.html_url),
-                .user = .{
-                    .login = try self.allocator.dupe(u8, issue.user.login),
-                    .html_url = try self.allocator.dupe(u8, issue.user.html_url),
-                },
-                .labels = try labels.toOwnedSlice(self.allocator),
-            });
+            issues.deinit(self.allocator);
+        }
+        for (parsed.value) |issue| {
+            issues.appendAssumeCapacity(try copyIssue(self.allocator, issue));
         }
         return try issues.toOwnedSlice(self.allocator);
     }
@@ -192,3 +272,75 @@ pub const GitHubApiClient = struct {
         self.allocator.free(issues);
     }
 };
+
+test "copyLabel cleans up on allocation failure" {
+    const src = models.Label{ .name = "bug", .color = "d73a4a" };
+    // 2 allocations: name, color
+    for (0..2) |i| {
+        var fa = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = i });
+        try std.testing.expectError(error.OutOfMemory, copyLabel(fa.allocator(), src));
+    }
+}
+
+test "copyLabels cleans up on allocation failure" {
+    const src = [_]models.Label{
+        .{ .name = "bug", .color = "d73a4a" },
+        .{ .name = "feature", .color = "0075ca" },
+    };
+    // 5 allocations: ArrayList backing, label[0].name, label[0].color, label[1].name, label[1].color
+    for (0..5) |i| {
+        var fa = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = i });
+        try std.testing.expectError(error.OutOfMemory, copyLabels(fa.allocator(), &src));
+    }
+}
+
+test "copyRelease cleans up on allocation failure" {
+    const src = models.Release{
+        .tag_name = "v1.0.0",
+        .name = "Release 1.0.0",
+        .published_at = "2024-01-01T00:00:00Z",
+    };
+    // 3 allocations: tag_name, name, published_at
+    for (0..3) |i| {
+        var fa = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = i });
+        try std.testing.expectError(error.OutOfMemory, copyRelease(fa.allocator(), src));
+    }
+}
+
+test "copyPullRequest cleans up on allocation failure" {
+    var label = models.Label{ .name = "bug", .color = "d73a4a" };
+    const src = models.PullRequest{
+        .number = 1,
+        .title = "Fix bug",
+        .body = "PR body",
+        .html_url = "https://github.com/owner/repo/pull/1",
+        .user = .{ .login = "author", .html_url = "https://github.com/author" },
+        .labels = @as([*]models.Label, @ptrCast(&label))[0..1],
+        .merged_at = "2024-01-01T12:00:00Z",
+    };
+    // 9 allocations: title, body, html_url, user.login, user.html_url,
+    //   labels backing, label.name, label.color, merged_at
+    for (0..9) |i| {
+        var fa = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = i });
+        try std.testing.expectError(error.OutOfMemory, copyPullRequest(fa.allocator(), src));
+    }
+}
+
+test "copyIssue cleans up on allocation failure" {
+    var label = models.Label{ .name = "bug", .color = "d73a4a" };
+    const src = models.Issue{
+        .number = 1,
+        .title = "Bug report",
+        .body = "Issue body",
+        .html_url = "https://github.com/owner/repo/issues/1",
+        .user = .{ .login = "reporter", .html_url = "https://github.com/reporter" },
+        .labels = @as([*]models.Label, @ptrCast(&label))[0..1],
+    };
+    // 8 allocations: title, body, html_url, user.login, user.html_url,
+    //   labels backing, label.name, label.color
+    for (0..8) |i| {
+        var fa = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = i });
+        try std.testing.expectError(error.OutOfMemory, copyIssue(fa.allocator(), src));
+    }
+}
+
