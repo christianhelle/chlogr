@@ -31,12 +31,65 @@ pub const Changelog = struct {
 pub const ChangelogGenerator = struct {
     allocator: std.mem.Allocator,
     exclude_labels: ?[]const u8 = null,
+    since_tag: ?[]const u8 = null,
+    until_tag: ?[]const u8 = null,
 
     pub fn init(allocator: std.mem.Allocator, exclude_labels: ?[]const u8) ChangelogGenerator {
         return ChangelogGenerator{
             .allocator = allocator,
             .exclude_labels = exclude_labels,
         };
+    }
+
+    /// Filter releases to the inclusive range [since_tag, until_tag].
+    /// Releases are assumed to be ordered newest-first (as returned by the GitHub API).
+    /// Returns error.SinceTagNotFound or error.UntilTagNotFound when a requested tag
+    /// does not exist in the provided releases slice.
+    fn filterReleasesByTagRange(self: ChangelogGenerator, releases: []models.Release) ![]models.Release {
+        const want_since = self.since_tag != null;
+        const want_until = self.until_tag != null;
+        if (!want_since and !want_until) return releases;
+
+        var since_idx: ?usize = null;
+        var until_idx: ?usize = null;
+
+        for (releases, 0..) |release, i| {
+            if (want_since and since_idx == null) {
+                if (std.mem.eql(u8, release.tag_name, self.since_tag.?)) {
+                    since_idx = i;
+                }
+            }
+            if (want_until and until_idx == null) {
+                if (std.mem.eql(u8, release.tag_name, self.until_tag.?)) {
+                    until_idx = i;
+                }
+            }
+        }
+
+        if (want_since and since_idx == null) return error.SinceTagNotFound;
+        if (want_until and until_idx == null) return error.UntilTagNotFound;
+
+        const lo = blk: {
+            if (since_idx != null and until_idx != null) {
+                break :blk @min(since_idx.?, until_idx.?);
+            } else if (until_idx != null) {
+                break :blk @as(usize, 0);
+            } else {
+                break :blk since_idx.?;
+            }
+        };
+
+        const hi = blk: {
+            if (since_idx != null and until_idx != null) {
+                break :blk @max(since_idx.?, until_idx.?) + 1;
+            } else if (since_idx != null) {
+                break :blk releases.len;
+            } else {
+                break :blk until_idx.? + 1;
+            }
+        };
+
+        return releases[lo..hi];
     }
 
     /// Check if an entry should be excluded based on labels
@@ -77,9 +130,13 @@ pub const ChangelogGenerator = struct {
         releases: []models.Release,
         prs: []models.PullRequest,
     ) !Changelog {
+        // Apply tag-range filter before assignment so --since-tag/--until-tag
+        // restrict which releases are considered.
+        const filtered = try self.filterReleasesByTagRange(releases);
+
         // Sort releases oldest-first so a greedy single pass assigns each PR to the
         // earliest qualifying release, guaranteeing exactly one assignment per PR.
-        const sorted = try self.allocator.dupe(models.Release, releases);
+        const sorted = try self.allocator.dupe(models.Release, filtered);
         defer self.allocator.free(sorted);
         std.mem.sort(models.Release, sorted, {}, releaseOldestFirst);
 
