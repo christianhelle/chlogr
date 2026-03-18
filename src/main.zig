@@ -62,7 +62,7 @@ pub fn main() !void {
     };
     defer api_client.freeReleases(releases);
 
-    const prs = api_client.getMergedPullRequests(100) catch |err| {
+    const prs = api_client.getMergedPullRequests() catch |err| {
         std.debug.print("Error fetching pull requests: {}\n", .{err});
         return err;
     };
