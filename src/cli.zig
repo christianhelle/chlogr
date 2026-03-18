@@ -1,5 +1,7 @@
 const std = @import("std");
 
+pub const VERSION = "0.1.0";
+
 pub const CliArgs = struct {
     repo: ?[]const u8 = null,
     token: ?[]const u8 = null,
@@ -60,9 +62,9 @@ pub const CliParser = struct {
         return result;
     }
 
-    pub fn printHelp() void {
-        const help_text =
-            \\GitHub Changelog Generator v0.1.0
+    pub fn printHelp(self: CliParser) !void {
+        const text =
+            \\GitHub Changelog Generator v{s}
             \\
             \\Usage: chlogr --repo <[org|user]/[repo]> [options]
             \\
@@ -82,6 +84,8 @@ pub const CliParser = struct {
             \\  chlogr --repo github/cli --token ghp_xxxx --output HISTORY.md
             \\
         ;
+        const help_text = try std.fmt.allocPrint(self.allocator, text, .{VERSION});
+        defer self.allocator.free(help_text);
         std.debug.print("{s}", .{help_text});
     }
 };
