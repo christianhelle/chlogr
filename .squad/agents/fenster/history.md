@@ -146,3 +146,188 @@ for (json_releases) |json_release| {
 - GitHub API pagination requires Link header parsing
 - Unmanaged ArrayList API takes allocator as first parameter in all methods
 - Process termination has 4 states: Exited(code), Signal, Stopped, Unknown
+
+---
+
+## Session 2026-03-18: P1 Correctness Fixes
+
+### All 6 P1 Issues Implemented ✅
+
+**Branch Strategy:** Independent feature branches for parallel development
+- fix/7-pagination-support
+- fix/5-release-assignment-semantics  
+- fix/9-label-exclusion-exact-match
+- fix/6-api-deep-copy-cleanup
+- fix/8-tag-filter-rejection
+- fix/10-release-link-rendering
+
+### Issue #7: Pagination Implementation ✅
+**Problem:**
+- Only first 100 items fetched (default page size)
+- No Link header parsing
+- Missing merged_at filtering in PR queries
+
+**Solution:**
+- Added `link_header: ?[]u8` field to HttpResponse
+- Implemented `extractNextPageUrl()` to parse RFC 5988 Link headers
+- Modified `getReleases()` to loop through all pages
+- Modified `getMergedPullRequests()` to loop through all pages and filter by merged_at != null
+- Used 100 items per page for efficiency
+- Proper errdefer cleanup on partial page fetches
+
+**Key Learning:** GitHub's Link header format uses angle brackets and rel attributes:
+```
+<https://api.github.com/...?page=2>; rel="next", <https://...>; rel="last"
+```
+Parser tokenizes on commas, checks for `rel="next"`, extracts URL between `<` and `>`.
+
+### Issue #5: Timestamp Precision ✅
+**Problem:**
+- `parseDateToSlice()` truncated ISO-8601 to YYYY-MM-DD
+- Same-day PRs at different times treated as identical
+- PRs could appear in multiple releases or disappear
+
+**Solution:**
+- Removed `parseDateToSlice()` entirely
+- Changed `compareDates()` to use full ISO-8601 string comparison (lexicographic order works for ISO-8601)
+- Added explicit release sorting (newest first) before PR assignment
+- Changed `isBefore()` to `isBeforeOrEqual()` for boundary semantics
+- PRs merged at exact release time now belong to that release
+
+**Key Learning:** ISO-8601 timestamps are lexicographically sortable:
+```zig
+// This works because ISO-8601 format is: YYYY-MM-DDTHH:MM:SS.sssZ
+std.mem.order(u8, "2024-01-10T14:30:45.123456Z", "2024-01-10T14:30:45.123457Z") == .lt
+```
+
+### Issue #9: CSV Token Parsing ✅
+**Problem:**
+- Used `std.mem.indexOf()` for substring matching
+- "bug" would incorrectly exclude "bugfix"
+- No whitespace trimming in CSV
+
+**Solution:**
+- Changed to `std.mem.tokenizeScalar(u8, exclude, ',')` for CSV parsing
+- Trim each token with `std.mem.trim(u8, token, " \t\r\n")`
+- Skip empty tokens
+- Use `std.mem.eql()` for exact string matching
+
+**Key Learning:** Zig tokenization pattern:
+```zig
+var it = std.mem.tokenizeScalar(u8, csv_string, ',');
+while (it.next()) |token| {
+    const trimmed = std.mem.trim(u8, token, " \t\r\n");
+    if (trimmed.len == 0) continue;
+    // Process trimmed token
+}
+```
+
+### Issue #6: Deep-Copy Error Handling ✅
+**Problem:**
+- No cleanup on allocation failures in `getReleases()`, `getMergedPullRequests()`, `getClosedIssues()`
+- Partial structures leaked memory if mid-copy allocation failed
+- Example: if label[5].color allocation fails, labels[0..4] already allocated but not freed
+
+**Solution:**
+- Added top-level errdefer for ArrayList cleanup
+- Added per-field errdefer for each allocated string
+- Intermediate variables + errdefer before struct construction:
+```zig
+const title = try allocator.dupe(u8, pr.title);
+errdefer allocator.free(title);
+
+const body = if (pr.body) |b| try allocator.dupe(u8, b) else null;
+errdefer if (body) |b| allocator.free(b);
+
+// ... collect all fields, each with errdefer ...
+
+prs.appendAssumeCapacity(.{ .title = title, .body = body, ... });
+```
+
+**Key Learning:** errdefer pattern for complex allocations:
+1. Top-level errdefer for the collection (ArrayList)
+2. Inner errdefer for nested collections (labels ArrayList)
+3. Per-field errdefer for each allocated string
+4. Only construct struct after all allocations succeed
+
+### Issue #8: Feature Gate with Clear UX ✅
+**Problem:**
+- `--since-tag` and `--until-tag` parsed but never used
+- Silent failure (flags accepted but ignored)
+- README documented as working
+
+**Solution:**
+- Added validation in CLI parser
+- Return `error.NotYetImplemented` with multi-line helpful message
+- Error message includes:
+  - Clear statement: "not yet implemented"
+  - Current behavior: "all releases and PRs included"
+  - Tracking link: "https://github.com/.../issues/8"
+- Updated help text to move to "Planned Features" section
+
+**Key Learning:** Unimplemented feature pattern:
+```zig
+if (std.mem.eql(u8, arg, "--since-tag")) {
+    std.debug.print("Error: --since-tag is not yet implemented\n", .{});
+    std.debug.print("Track progress at: https://github.com/.../issues/8\n", .{});
+    return error.NotYetImplemented;
+}
+```
+
+### Issue #10: Parameterized Formatting ✅
+**Problem:**
+- Release links hardcoded to "https://github.com/owner/repo/releases/tag/{tag}"
+- All generated changelogs had broken links
+
+**Solution:**
+- Added `repo_slug: []const u8` field to MarkdownFormatter struct
+- Updated `init()` to accept repo_slug parameter
+- Changed format string to use `self.repo_slug`
+- Passed `parsed_args.repo.?` from main.zig
+- Updated all test files to pass "owner/repo" test slug
+
+**Key Learning:** Formatter parameterization pattern - pass runtime values at init, not at format time.
+
+### Learnings
+
+**Pagination Implementation:**
+- Link header parsing: tokenize on comma, search for `rel="next"`, extract URL between angle brackets
+- Loop pattern: fetch page → parse response → extract next URL → repeat until no next link
+- Page size: use 100 (GitHub max) for efficiency
+- Filter at fetch time (merged_at != null) to reduce memory usage
+
+**Timestamp Comparison:**
+- ISO-8601 is lexicographically sortable (YYYY-MM-DDTHH:MM:SS.sssZ format)
+- Don't truncate - preserve full precision
+- Explicit sorting before comparison avoids API order dependency
+- Boundary semantics: use `<=` for "belongs to this release"
+
+**CSV Parsing:**
+- `tokenizeScalar()` for delimiter splitting
+- `trim()` for whitespace removal
+- Skip empty tokens (handles double commas gracefully)
+- `eql()` for exact matching (not `indexOf()`)
+
+**Error Handling in Deep Copies:**
+- Top-level errdefer for collection cleanup
+- Per-item errdefer for nested allocations
+- Intermediate variables with errdefer before struct construction
+- Order: allocate all → errdefer all → construct struct
+
+**Feature Gating:**
+- Explicit error messages beat silent failures
+- Include tracking link for "not yet implemented"
+- Update help text to reflect reality
+- Return error early (fail fast)
+
+**Parameterization:**
+- Pass configuration at initialization, not per call
+- Store as struct field for reuse
+- Update all call sites (main + tests)
+
+**Zig Patterns Used:**
+- `tokenizeScalar()` for CSV parsing
+- `trim()` for whitespace handling
+- `std.mem.order()` for string comparison
+- `errdefer` for cleanup on error paths
+- Intermediate variables for complex allocations
