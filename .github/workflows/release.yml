@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  VERSION: "0.1.${{ github.run_number }}"
+  VERSION: "0.2.${{ github.run_number }}"
 
 permissions:
   contents: write
@@ -20,7 +20,7 @@ jobs:
       - name: Update release versions
         run: |
           sed -i "s/^version: .*/version: ${{ env.VERSION }}/" snapcraft.yaml
-          sed -i "s/^pub const version = \".*\";$/pub const version = \"${{ env.VERSION }}\";/" src/cli.zig
+          sed -i "s/^pub const VERSION = \".*\";$/pub const VERSION = \"${{ env.VERSION }}\";/" src/cli.zig
 
       - name: Commit, tag, and push
         id: bump

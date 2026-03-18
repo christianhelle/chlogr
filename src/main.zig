@@ -18,18 +18,18 @@ pub fn main() !void {
     const cli_parser = cli.CliParser.init(allocator);
     const parsed_args = cli_parser.parse(args) catch |err| {
         if (err == error.HelpRequested) {
-            cli.CliParser.printHelp();
+            try cli_parser.printHelp();
             return;
         }
         std.debug.print("Error: {}\n", .{err});
-        cli.CliParser.printHelp();
+        try cli_parser.printHelp();
         return err;
     };
 
     // Validate required arguments
     if (parsed_args.repo == null) {
         std.debug.print("Error: --repo is required\n\n", .{});
-        cli.CliParser.printHelp();
+        try cli_parser.printHelp();
         return error.MissingRequiredArgs;
     }
 
