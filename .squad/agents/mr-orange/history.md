@@ -92,3 +92,82 @@ Replaced the previous `std.mem.indexOf`-based substring check with exact token m
 - `ArrayList(u8).writer()` returns a `std.io.Writer` compatible with `std.fmt.format` — this is the idiomatic Zig pattern for building strings without repeated allocations.
 - `ensureTotalCapacity` on a hash map takes an `Allocator` in Zig 0.15.2 (`try map.ensureTotalCapacity(allocator, 3)`).
 - 20 tests continue to pass — the refactor is behaviour-preserving.
+
+---
+
+## Parallel Fetch Research (2025-01-22)
+
+### Context
+Researched and documented requirements for implementing a `--parallel` flag to fetch GitHub releases and PRs concurrently using Zig 0.15.2 std.Thread API.
+
+### Learnings
+
+**Zig 0.15.2 Threading Model:**
+- `std.Thread.spawn(.{}, func, .{args...})` creates threads with tuple-based argument passing
+- `thread.join()` returns `void` — results must be communicated via shared state (not return values)
+- Thread functions receive parameters by value; shared state requires explicit pointer passing
+- No special build flags needed — `std.Thread` is part of core stdlib
+
+**Thread Safety:**
+- `std.http.Client` is NOT thread-safe when shared — each thread MUST create its own instance
+- `std.Thread.Mutex` provides mutual exclusion for shared result structures
+- `std.debug.print()` IS thread-safe (uses internal stderr mutex) — safe for concurrent progress printing
+- GPA allocator is internally thread-safe
+
+**Error Propagation Pattern:**
+- Since `join()` returns void, errors must be stored in a shared result struct protected by mutex
+- Main thread checks error fields after join, propagates first encountered error
+- Partial success (one thread succeeds, one fails) requires explicit cleanup by main thread
+
+**Memory Ownership:**
+- Thread allocates data via its thread-local `GitHubApiClient`
+- On success, ownership transfers to shared `FetchResults` struct
+- Main thread takes ownership after join, responsible for calling `freeReleases()` / `freePullRequests()`
+- `errdefer` in API client methods prevents leaks on per-thread failures
+
+**Result Struct Pattern:**
+```zig
+const FetchResults = struct {
+    releases: ?[]models.Release = null,
+    prs: ?[]models.PullRequest = null,
+    releases_err: ?anyerror = null,
+    prs_err: ?anyerror = null,
+    mutex: std.Thread.Mutex = .{},
+};
+```
+
+**Design Decision:**
+Parallel mode must produce byte-for-byte identical output to sequential mode. Since `ChangelogGenerator.generate()` operates deterministically on release/PR slices (timestamp-based assignment), fetch order does not affect final changelog content.
+
+**Documentation:**
+Complete technical design written to `.squad/agents/mr-orange/parallel-fetch-design.md` covering:
+- Thread safety analysis
+- FetchResults struct design
+- Thread function signatures
+- Error propagation strategy
+- Memory ownership model
+- Progress printing thread safety
+- Implementation sketch with code samples
+- Testing strategy
+- Performance expectations
+
+---
+
+## Issue #27 — Add `--parallel` flag to CLI argument parsing (PR #32)
+
+**Branch:** `feature/27-parallel-cli-flag`
+
+**Approach used:**
+Added `parallel: bool = false` field to `CliArgs` struct in `src/cli.zig`. The flag is parsed as a presence-only boolean (no value required). Added to help text under Options section. Also added 10 comprehensive CLI parsing tests covering all argument types (previously no CLI tests existed).
+
+**Key decisions:**
+- `--parallel` is a boolean flag (presence = true, absence = false)
+- Tests added inline in `cli.zig` using `test "..."` blocks (matching pattern in `github_api.zig`)
+- Tests cover: flag present/absent, all existing arguments, help behavior, unknown arguments, and combined flags
+- The flag is parsed but NOT yet used in `main.zig` — that's issue #30
+- Build gate passed: `zig build` ✓
+- Test gate passed: `zig build test` ✓ (all 30 tests pass, including 10 new CLI tests)
+
+**Commit:** `b078f56 feat: add --parallel flag to CLI argument parsing`
+
+**PR:** #32 (https://github.com/christianhelle/chlogr/pull/32)
