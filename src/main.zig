@@ -87,7 +87,7 @@ pub fn main() !void {
     defer gen.deinitChangelog(changelog);
 
     // Format to Markdown
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator);
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, parsed_args.repo.?);
     const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
     defer formatter.deinit(markdown);
 
