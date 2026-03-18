@@ -45,13 +45,12 @@ pub fn main() !void {
         std.debug.print("Token: none (anonymous access - may have lower rate limits)\n", .{});
         std.debug.print("  To get higher rate limits, provide a token via --token flag, GITHUB_TOKEN env var, GH_TOKEN env var, or gh CLI\n", .{});
     }
-    std.debug.print("\nFetching data from GitHub...\n", .{});
-
     // Initialize GitHub API client
     var api_client = github_api.GitHubApiClient.init(allocator, resolved_token.value, parsed_args.repo.?);
     defer api_client.deinit();
 
     // Fetch releases and PRs
+    std.debug.print("\nFetching releases...\n", .{});
     const releases = api_client.getReleases() catch |err| {
         if (err == error.GitHubApiError) {
             std.debug.print("Error: GitHub API returned an error (check token validity and repo access)\n", .{});
@@ -62,6 +61,7 @@ pub fn main() !void {
     };
     defer api_client.freeReleases(releases);
 
+    std.debug.print("Fetching pull requests...\n", .{});
     const prs = api_client.getMergedPullRequests() catch |err| {
         std.debug.print("Error fetching pull requests: {}\n", .{err});
         return err;
