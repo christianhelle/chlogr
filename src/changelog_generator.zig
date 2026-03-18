@@ -92,14 +92,21 @@ pub const ChangelogGenerator = struct {
         return releases[lo..hi];
     }
 
-    /// Check if an entry should be excluded based on labels
+    /// Check if an entry should be excluded based on labels.
+    /// The exclude_labels string is a comma-separated list of tokens; each token is
+    /// trimmed of whitespace and compared against PR label names using exact equality.
     fn shouldExclude(self: ChangelogGenerator, labels: []models.Label) bool {
         if (self.exclude_labels == null) return false;
 
         const exclude = self.exclude_labels.?;
-        for (labels) |label| {
-            if (std.mem.indexOf(u8, exclude, label.name) != null) {
-                return true;
+        var token_it = std.mem.splitScalar(u8, exclude, ',');
+        while (token_it.next()) |raw_token| {
+            const token = std.mem.trim(u8, raw_token, " \t");
+            if (token.len == 0) continue;
+            for (labels) |label| {
+                if (std.mem.eql(u8, label.name, token)) {
+                    return true;
+                }
             }
         }
         return false;
