@@ -47,3 +47,13 @@ Both `getReleases` and `getMergedPullRequests` were converted from single-reques
 - `errdefer` on the outer `ArrayList` covers partial accumulation across pages — if any page fetch, parse, or copy fails, all previously copied items are freed correctly.
 - URL strings built with `std.fmt.allocPrint` are freed via `defer` immediately after the HTTP call, keeping per-page memory transient.
 - `toOwnedSlice(allocator)` is called once at the end to transfer ownership to the caller.
+### Issue #8 — --since-tag / --until-tag filtering (PR #18)
+
+**Approach used:**  
+Tag filtering is implemented as a pre-processing step inside `ChangelogGenerator.generate()` via a new private method `filterReleasesByTagRange`. The method scans the releases slice (assumed newest-first, matching GitHub API ordering) to find the index positions of the requested tags, then returns a sub-slice covering the inclusive range. With only `since_tag`, it returns from that index to the end of the slice (older releases); with only `until_tag`, it returns from the start to that index. With both, it uses `min`/`max` of the two indices to produce the correct window regardless of which index is lower.
+
+**Key decisions:**
+- Fields `since_tag` and `until_tag` were added with `null` defaults to `ChangelogGenerator` so no existing `init(allocator, exclude_labels)` call sites needed changing.
+- Callers set them directly after `init`: `gen.since_tag = parsed_args.since_tag;`
+- Unknown tags return typed errors (`SinceTagNotFound` / `UntilTagNotFound`) rather than silent empty results; `main.zig` prints a clear diagnostic before propagating the error.
+- The filter returns a slice of the original releases array — no allocation required.

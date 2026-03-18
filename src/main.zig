@@ -72,7 +72,18 @@ pub fn main() !void {
 
     // Generate changelog
     var gen = changelog_generator.ChangelogGenerator.init(allocator, parsed_args.exclude_labels);
-    const changelog = try gen.generate(releases, prs);
+    gen.since_tag = parsed_args.since_tag;
+    gen.until_tag = parsed_args.until_tag;
+    const changelog = gen.generate(releases, prs) catch |err| {
+        if (err == error.SinceTagNotFound) {
+            std.debug.print("Error: --since-tag '{s}' was not found in the fetched releases\n", .{parsed_args.since_tag.?});
+            return err;
+        } else if (err == error.UntilTagNotFound) {
+            std.debug.print("Error: --until-tag '{s}' was not found in the fetched releases\n", .{parsed_args.until_tag.?});
+            return err;
+        }
+        return err;
+    };
     defer gen.deinitChangelog(changelog);
 
     // Format to Markdown

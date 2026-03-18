@@ -324,3 +324,69 @@ pub const test_pull_requests_pre_first_release =
     \\  }
     \\]
 ;
+
+pub const test_releases_four_versions =
+    \\[
+    \\  {
+    \\    "tag_name": "v1.3.0",
+    \\    "name": "Release v1.3.0",
+    \\    "published_at": "2024-03-01T10:00:00Z"
+    \\  },
+    \\  {
+    \\    "tag_name": "v1.2.0",
+    \\    "name": "Release v1.2.0",
+    \\    "published_at": "2024-02-01T10:00:00Z"
+    \\  },
+    \\  {
+    \\    "tag_name": "v1.1.0",
+    \\    "name": "Release v1.1.0",
+    \\    "published_at": "2024-01-15T10:00:00Z"
+    \\  },
+    \\  {
+    \\    "tag_name": "v1.0.0",
+    \\    "name": "Release v1.0.0",
+    \\    "published_at": "2024-01-01T10:00:00Z"
+    \\  }
+    \\]
+;
+
+pub const test_prs_for_four_versions =
+    \\[
+    \\  {
+    \\    "number": 500,
+    \\    "title": "v1.3.0 feature",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/500",
+    \\    "user": { "login": "alice", "html_url": "https://github.com/alice" },
+    \\    "labels": [{ "name": "feature", "color": "0366d6" }],
+    \\    "merged_at": "2024-02-28T12:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 501,
+    \\    "title": "v1.2.0 fix",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/501",
+    \\    "user": { "login": "bob", "html_url": "https://github.com/bob" },
+    \\    "labels": [{ "name": "bug", "color": "d73a4a" }],
+    \\    "merged_at": "2024-01-31T12:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 502,
+    \\    "title": "v1.1.0 enhancement",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/502",
+    \\    "user": { "login": "charlie", "html_url": "https://github.com/charlie" },
+    \\    "labels": [{ "name": "enhancement", "color": "84b6eb" }],
+    \\    "merged_at": "2024-01-14T12:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 503,
+    \\    "title": "v1.0.0 initial",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/503",
+    \\    "user": { "login": "dave", "html_url": "https://github.com/dave" },
+    \\    "labels": [],
+    \\    "merged_at": "2023-12-31T12:00:00Z"
+    \\  }
+    \\]
+;
