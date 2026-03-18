@@ -251,3 +251,76 @@ pub const test_empty_releases =
 pub const test_empty_prs = 
     \\[]
 ;
+
+// Regression: same-day / same-timestamp boundary — PR merged at exact release timestamp
+// must appear in that release, not in unreleased.
+pub const test_releases_same_day =
+    \\[
+    \\  {
+    \\    "tag_name": "v2.0.0",
+    \\    "name": "Release v2.0.0",
+    \\    "published_at": "2024-03-01T12:00:00Z"
+    \\  }
+    \\]
+;
+
+pub const test_pull_requests_same_day_as_release =
+    \\[
+    \\  {
+    \\    "number": 500,
+    \\    "title": "Same-timestamp merge PR",
+    \\    "body": "Merged at the exact same timestamp as the release",
+    \\    "html_url": "https://github.com/owner/repo/pull/500",
+    \\    "user": {
+    \\      "login": "alice",
+    \\      "html_url": "https://github.com/alice"
+    \\    },
+    \\    "labels": [
+    \\      {
+    \\        "name": "feature",
+    \\        "color": "0366d6"
+    \\      }
+    \\    ],
+    \\    "merged_at": "2024-03-01T12:00:00Z"
+    \\  }
+    \\]
+;
+
+// Regression: duplicate prevention — a PR merged before both releases must appear in
+// exactly one section (the oldest qualifying release), not in both.
+pub const test_releases_two_versions =
+    \\[
+    \\  {
+    \\    "tag_name": "v1.0.0",
+    \\    "name": "Release v1.0.0",
+    \\    "published_at": "2024-01-01T10:00:00Z"
+    \\  },
+    \\  {
+    \\    "tag_name": "v2.0.0",
+    \\    "name": "Release v2.0.0",
+    \\    "published_at": "2024-02-01T10:00:00Z"
+    \\  }
+    \\]
+;
+
+pub const test_pull_requests_pre_first_release =
+    \\[
+    \\  {
+    \\    "number": 600,
+    \\    "title": "Pre-release PR",
+    \\    "body": "Merged before the first release",
+    \\    "html_url": "https://github.com/owner/repo/pull/600",
+    \\    "user": {
+    \\      "login": "alice",
+    \\      "html_url": "https://github.com/alice"
+    \\    },
+    \\    "labels": [
+    \\      {
+    \\        "name": "feature",
+    \\        "color": "0366d6"
+    \\      }
+    \\    ],
+    \\    "merged_at": "2023-12-01T10:00:00Z"
+    \\  }
+    \\]
+;
