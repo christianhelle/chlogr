@@ -1,0 +1,59 @@
+{
+  "registry_version": "1.0",
+  "agents": [
+    {
+      "persistent_name": "Mr. White",
+      "folder": "mr-white",
+      "role": "Lead",
+      "universe": "Reservoir Dogs",
+      "created_at": "2026-03-18",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Mr. Orange",
+      "folder": "mr-orange",
+      "role": "Systems Dev",
+      "universe": "Reservoir Dogs",
+      "created_at": "2026-03-18",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Mr. Pink",
+      "folder": "mr-pink",
+      "role": "Tester",
+      "universe": "Reservoir Dogs",
+      "created_at": "2026-03-18",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Mr. Blonde",
+      "folder": "mr-blonde",
+      "role": "DevOps/Release",
+      "universe": "Reservoir Dogs",
+      "created_at": "2026-03-18",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Scribe",
+      "folder": "scribe",
+      "role": "Scribe",
+      "universe": null,
+      "created_at": "2026-03-18",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Ralph",
+      "folder": null,
+      "role": "Work Monitor",
+      "universe": null,
+      "created_at": "2026-03-18",
+      "legacy_named": false,
+      "status": "active"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "history_version": "1.0",
+  "assignments": [
+    {
+      "assignment_id": "chlogr-2026-03-18",
+      "date": "2026-03-18",
+      "universe": "Reservoir Dogs",
+      "project": "chlogr",
+      "requested_by": "Christian Helle",
+      "agents": [
+        { "name": "Mr. White", "role": "Lead" },
+        { "name": "Mr. Orange", "role": "Systems Dev" },
+        { "name": "Mr. Pink", "role": "Tester" },
+        { "name": "Mr. Blonde", "role": "DevOps/Release" }
+      ]
+    }
+  ]
+}
