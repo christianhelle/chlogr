@@ -144,30 +144,13 @@ pub const GitHubApiClient = struct {
         return try all_releases.toOwnedSlice(self.allocator);
     }
 
-    /// Fetch merged pull requests
-    pub fn getMergedPullRequests(self: *GitHubApiClient, per_page: u32) ![]models.PullRequest {
-        const endpoint = try std.fmt.allocPrint(self.allocator, "/repos/{s}/pulls?state=closed&per_page={d}&sort=updated&direction=desc", .{ self.repo, per_page });
-        defer self.allocator.free(endpoint);
-
-        const response = try self.http_client.get(endpoint);
-        defer self.allocator.free(response.body);
-
-        if (response.status != .ok) {
-            return error.GitHubApiError;
-        }
-
-        var parsed = try std.json.parseFromSlice(
-            []models.PullRequest,
-            self.allocator,
-            response.body,
-            .{ .ignore_unknown_fields = true },
-        );
-        defer parsed.deinit();
-
-        // Deep copy PRs with string and struct duplication
-        var prs = try std.ArrayList(models.PullRequest).initCapacity(self.allocator, parsed.value.len);
+    /// Fetch merged pull requests (paginated)
+    pub fn getMergedPullRequests(self: *GitHubApiClient) ![]models.PullRequest {
+        const per_page: u32 = 100;
+        var page: u32 = 1;
+        var all_prs = try std.ArrayList(models.PullRequest).initCapacity(self.allocator, 0);
         errdefer {
-            for (prs.items) |pr| {
+            for (all_prs.items) |pr| {
                 self.allocator.free(pr.title);
                 if (pr.body) |b| self.allocator.free(b);
                 self.allocator.free(pr.html_url);
@@ -180,12 +163,38 @@ pub const GitHubApiClient = struct {
                 self.allocator.free(pr.labels);
                 if (pr.merged_at) |m| self.allocator.free(m);
             }
-            prs.deinit(self.allocator);
+            all_prs.deinit(self.allocator);
         }
-        for (parsed.value) |pr| {
-            prs.appendAssumeCapacity(try copyPullRequest(self.allocator, pr));
+
+        while (true) {
+            const endpoint = try std.fmt.allocPrint(self.allocator, "/repos/{s}/pulls?state=closed&page={d}&per_page={d}&sort=updated&direction=desc", .{ self.repo, page, per_page });
+            defer self.allocator.free(endpoint);
+
+            const response = try self.http_client.get(endpoint);
+            defer self.allocator.free(response.body);
+
+            if (response.status != .ok) {
+                return error.GitHubApiError;
+            }
+
+            var parsed = try std.json.parseFromSlice(
+                []models.PullRequest,
+                self.allocator,
+                response.body,
+                .{ .ignore_unknown_fields = true },
+            );
+            defer parsed.deinit();
+
+            const page_count = parsed.value.len;
+            for (parsed.value) |pr| {
+                try all_prs.append(self.allocator, try copyPullRequest(self.allocator, pr));
+            }
+
+            if (page_count < per_page) break;
+            page += 1;
         }
-        return try prs.toOwnedSlice(self.allocator);
+
+        return try all_prs.toOwnedSlice(self.allocator);
     }
 
     /// Fetch closed issues
