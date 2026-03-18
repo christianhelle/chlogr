@@ -1,0 +1,5 @@
+{
+  "universes": ["the-usual-suspects"],
+  "capacity": 6,
+  "default_confidence": "low"
+}
