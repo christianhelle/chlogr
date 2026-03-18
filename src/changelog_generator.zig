@@ -165,7 +165,7 @@ pub const ChangelogGenerator = struct {
             }
         }
 
-        var unreleased_sections_map = std.StringHashMap(std.ArrayList(ChangelogEntry)).init(self.allocator);
+        var unreleased_sections_map = std.StringHashMap(std.ArrayListUnmanaged(ChangelogEntry)).init(self.allocator);
         defer {
             var it = unreleased_sections_map.iterator();
             while (it.next()) |entry| {
@@ -186,10 +186,9 @@ pub const ChangelogGenerator = struct {
             has_unreleased = true;
             const category = self.categorizeEntry(pr.labels);
 
-            var section_list = unreleased_sections_map.getOrPut(category) catch continue;
-            if (!section_list.found_existing) {
-                const arr = try std.ArrayList(ChangelogEntry).initCapacity(self.allocator, prs.len);
-                section_list.value_ptr.* = arr;
+            var gop = try unreleased_sections_map.getOrPut(category);
+            if (!gop.found_existing) {
+                gop.value_ptr.* = .empty;
             }
 
             const entry = ChangelogEntry{
@@ -199,7 +198,7 @@ pub const ChangelogGenerator = struct {
                 .number = pr.number,
             };
 
-            try section_list.value_ptr.append(self.allocator, entry);
+            try gop.value_ptr.append(self.allocator, entry);
         }
 
         var unreleased: ?UnreleasedChanges = null;
