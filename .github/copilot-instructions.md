@@ -84,6 +84,35 @@ If you need to fix something on main:
 3. Open a PR
 4. Merge normally
 
+## README Hygiene
+
+**Keep README.md in sync with the feature set at all times.**
+
+When implementing any change that affects user-facing behaviour — new CLI flags, changed defaults, new output, removed features, updated options — the README **must** be updated in the same PR or a dedicated follow-up PR before closing the issue.
+
+### What triggers a README update
+
+- New CLI flag or option added or removed
+- Changed default values or behaviour
+- New usage examples or modes
+- New features listed in the Features section
+- Changed output format or file names
+- Updated build or test requirements
+
+### How to update the README
+
+1. Edit `README.md` in the same branch as the feature change, OR
+2. Open a separate `docs/` branch immediately after the feature PR merges
+
+Either is acceptable. What is NOT acceptable: closing an issue or merging a feature PR while README is out of sync.
+
+### README sections to keep current
+
+- **Features** — bullet list of what the tool does
+- **Options** — every CLI flag with description and default
+- **Usage examples** — at least one example per major flag or mode
+- **Development → Running Tests** — reflects what the test suite actually covers
+
 ## Summary
 
 - **Branch:** `fix/{N}-{slug}` or `feature/{N}-{slug}`
@@ -92,3 +121,4 @@ If you need to fix something on main:
 - **Test:** `zig build test` must pass
 - **PR:** Always via pull request, reference issues, wait for approval
 - **Main:** Never force-push, never direct commits
+- **README:** Update README.md for any user-facing feature change
