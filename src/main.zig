@@ -56,7 +56,7 @@ pub fn main() !void {
     };
 
     const fetched: FetchedData = if (parsed_args.parallel) blk: {
-        std.debug.print("\nFetching data in parallel...\n", .{});
+        std.debug.print("\nFetching data...\n", .{});
         var fetcher = github_api.ParallelFetcher.init(allocator, resolved_token.value, parsed_args.repo.?);
         const fetch_results = fetcher.fetch() catch |err| {
             if (err == error.GitHubApiError) {
