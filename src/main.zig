@@ -43,10 +43,15 @@ pub fn main() !void {
     std.debug.print("Output: {s}\n", .{parsed_args.output});
     if (!resolved_token.has_token) {
         std.debug.print("Token: none (anonymous access - may have lower rate limits)\n", .{});
-        std.debug.print("  To get higher rate limits, provide a token via --token flag, GITHUB_TOKEN env var, GH_TOKEN env var, or gh CLI\n", .{});
+        std.debug.print("  To get higher rate limits, provide a token via --token flag,\n", .{});
+        std.debug.print("  GITHUB_TOKEN env var, GH_TOKEN env var, or gh CLI\n", .{});
     }
     // Initialize GitHub API client
-    var api_client = github_api.GitHubApiClient.init(allocator, resolved_token.value, parsed_args.repo.?);
+    var api_client = github_api.GitHubApiClient.init(
+        allocator,
+        resolved_token.value,
+        parsed_args.repo.?,
+    );
     defer api_client.deinit();
 
     // Fetch releases and PRs
@@ -57,10 +62,18 @@ pub fn main() !void {
 
     const fetched: FetchedData = if (parsed_args.parallel) blk: {
         std.debug.print("\nFetching data...\n", .{});
-        var fetcher = github_api.ParallelFetcher.init(allocator, resolved_token.value, parsed_args.repo.?);
+        var fetcher = github_api.ParallelFetcher.init(
+            allocator,
+            resolved_token.value,
+            parsed_args.repo.?,
+            parsed_args.degree_of_parallelism,
+        );
         const fetch_results = fetcher.fetch() catch |err| {
             if (err == error.GitHubApiError) {
-                std.debug.print("Error: GitHub API returned an error (check token validity and repo access)\n", .{});
+                std.debug.print(
+                    "Error: GitHub API returned an error (check token validity and repo access)\n",
+                    .{},
+                );
             } else {
                 std.debug.print("Error fetching data in parallel: {}\n", .{err});
             }
@@ -71,7 +84,10 @@ pub fn main() !void {
         std.debug.print("\nFetching releases...\n", .{});
         const releases = api_client.getReleases() catch |err| {
             if (err == error.GitHubApiError) {
-                std.debug.print("Error: GitHub API returned an error (check token validity and repo access)\n", .{});
+                std.debug.print(
+                    "Error: GitHub API returned an error (check token validity and repo access)\n",
+                    .{},
+                );
             } else {
                 std.debug.print("Error fetching releases: {}\n", .{err});
             }
@@ -87,18 +103,30 @@ pub fn main() !void {
     defer api_client.freeReleases(fetched.releases);
     defer api_client.freePullRequests(fetched.prs);
 
-    std.debug.print("Found {d} releases and {d} pull requests\n", .{ fetched.releases.len, fetched.prs.len });
+    std.debug.print(
+        "Found {d} releases and {d} pull requests\n",
+        .{ fetched.releases.len, fetched.prs.len },
+    );
 
     // Generate changelog
-    var gen = changelog_generator.ChangelogGenerator.init(allocator, parsed_args.exclude_labels);
+    var gen = changelog_generator.ChangelogGenerator.init(
+        allocator,
+        parsed_args.exclude_labels,
+    );
     gen.since_tag = parsed_args.since_tag;
     gen.until_tag = parsed_args.until_tag;
     const changelog = gen.generate(fetched.releases, fetched.prs) catch |err| {
         if (err == error.SinceTagNotFound) {
-            std.debug.print("Error: --since-tag '{s}' was not found in the fetched releases\n", .{parsed_args.since_tag.?});
+            std.debug.print(
+                "Error: --since-tag '{s}' was not found in the fetched releases\n",
+                .{parsed_args.since_tag.?},
+            );
             return err;
         } else if (err == error.UntilTagNotFound) {
-            std.debug.print("Error: --until-tag '{s}' was not found in the fetched releases\n", .{parsed_args.until_tag.?});
+            std.debug.print(
+                "Error: --until-tag '{s}' was not found in the fetched releases\n",
+                .{parsed_args.until_tag.?},
+            );
             return err;
         }
         return err;
@@ -106,8 +134,14 @@ pub fn main() !void {
     defer gen.deinitChangelog(changelog);
 
     // Format to Markdown
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, parsed_args.repo.?);
-    const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
+    var formatter = markdown_formatter.MarkdownFormatter.init(
+        allocator,
+        parsed_args.repo.?,
+    );
+    const markdown = try formatter.formatWithUnreleased(
+        changelog.releases,
+        changelog.unreleased,
+    );
     defer formatter.deinit(markdown);
 
     // Write to file

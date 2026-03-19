@@ -375,6 +375,7 @@ const PrsThreadCtx = struct {
     allocator: std.mem.Allocator,
     token: []const u8,
     repo: []const u8,
+    degree_of_parallelism: u32,
     results: *ParallelFetchResults,
 };
 
@@ -389,7 +390,7 @@ const PrsPaginationThreadCtx = struct {
     token: []const u8,
     repo: []const u8,
     page: u32,
-    total_pages: u8,
+    total_pages: u32,
     result: *PrsPaginationResult,
 
     pub fn deinit(self: PrsPaginationThreadCtx) void {
@@ -413,23 +414,27 @@ fn prsThreadFn(ctx: PrsThreadCtx) void {
     var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
     defer client.deinit();
 
-    const res = client.getMergedPullRequestsByPage(1) catch |err| {
-        ctx.results.prs_err = err;
-        return;
-    };
-    ctx.results.prs = res.prs;
-    if (!res.has_more) {
-        return;
-    }
-
-    const dop: u32 = 4; // degree of parallelism - number of concurrent threads to fetch PR pages
+    const dop: u32 = ctx.degree_of_parallelism;
     var batch: u32 = 1;
-    var page: u32 = 2;
+    var page: u32 = 1;
 
     while (true) {
         var idx: u32 = 0;
-        var threads: [dop]std.Thread = undefined;
-        var thread_ctxs: [dop]PrsPaginationThreadCtx = undefined;
+        var threads: [32]std.Thread = undefined;
+        var thread_ctxs: [32]PrsPaginationThreadCtx = undefined;
+        var active_count: u32 = 0;
+
+        errdefer {
+            var i: u32 = 0;
+            while (i < active_count) : (i += 1) {
+                threads[i].join();
+            }
+            var j: u32 = 0;
+            while (j < active_count) : (j += 1) {
+                thread_ctxs[j].deinit();
+            }
+        }
+
         while (idx < dop) {
             const result_ptr = ctx.allocator.create(PrsPaginationResult) catch |err| {
                 ctx.results.prs_err = err;
@@ -445,29 +450,42 @@ fn prsThreadFn(ctx: PrsThreadCtx) void {
             };
             thread_ctxs[idx] = thread_ctx;
             threads[idx] = std.Thread.spawn(.{}, prsPaginationThreadFn, .{thread_ctx}) catch |err| {
+                thread_ctx.deinit();
+                var i: u32 = 0;
+                while (i < idx) : (i += 1) {
+                    threads[i].join();
+                }
+                var j: u32 = 0;
+                while (j <= idx) : (j += 1) {
+                    thread_ctxs[j].deinit();
+                }
                 ctx.results.prs_err = err;
                 return;
             };
+            active_count += 1;
             page += 1;
             idx += 1;
         }
         batch += 1;
 
-        for (threads) |thread| {
-            thread.join();
+        var ti: u32 = 0;
+        while (ti < active_count) : (ti += 1) {
+            threads[ti].join();
         }
 
-        for (thread_ctxs) |thread_ctx| {
-            if (thread_ctx.result.prs.len > 0) {
+        var i: u32 = 0;
+        while (i < active_count) : (i += 1) {
+            const tc = &thread_ctxs[i];
+            if (tc.result.prs.len > 0) {
                 const existing = ctx.results.prs;
-                const incoming = thread_ctx.result.prs;
+                const incoming = tc.result.prs;
                 const merged = ctx.allocator.alloc(
                     models.PullRequest,
                     existing.len + incoming.len,
                 ) catch |err| {
-                    thread_ctx.deinit();
-                    for (thread_ctxs[idx + 1 ..]) |tc| {
-                        tc.deinit();
+                    var j: u32 = i + 1;
+                    while (j < active_count) : (j += 1) {
+                        thread_ctxs[j].deinit();
                     }
                     ctx.results.prs_err = err;
                     return;
@@ -476,9 +494,9 @@ fn prsThreadFn(ctx: PrsThreadCtx) void {
                 @memcpy(merged[existing.len..], incoming);
                 ctx.results.prs = merged;
                 ctx.allocator.free(existing);
-                thread_ctx.deinit();
+                tc.deinit();
             } else {
-                thread_ctx.deinit();
+                tc.deinit();
                 return;
             }
         }
@@ -499,9 +517,20 @@ pub const ParallelFetcher = struct {
     allocator: std.mem.Allocator,
     token: []const u8,
     repo: []const u8,
+    degree_of_parallelism: u32,
 
-    pub fn init(allocator: std.mem.Allocator, token: []const u8, repo: []const u8) ParallelFetcher {
-        return .{ .allocator = allocator, .token = token, .repo = repo };
+    pub fn init(
+        allocator: std.mem.Allocator,
+        token: []const u8,
+        repo: []const u8,
+        degree_of_parallelism: u32,
+    ) ParallelFetcher {
+        return .{
+            .allocator = allocator,
+            .token = token,
+            .repo = repo,
+            .degree_of_parallelism = degree_of_parallelism,
+        };
     }
 
     /// Fetch releases and PRs concurrently. Caller owns the returned slices.
@@ -519,6 +548,7 @@ pub const ParallelFetcher = struct {
             .allocator = self.allocator,
             .token = self.token,
             .repo = self.repo,
+            .degree_of_parallelism = self.degree_of_parallelism,
             .results = &results,
         };
 

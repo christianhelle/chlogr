@@ -10,6 +10,7 @@ pub const CliArgs = struct {
     until_tag: ?[]const u8 = null,
     exclude_labels: ?[]const u8 = null,
     parallel: bool = false,
+    degree_of_parallelism: u32 = 4,
 };
 
 pub const CliParser = struct {
@@ -53,7 +54,20 @@ pub const CliParser = struct {
                 if (i >= args.len) return error.MissingExcludeLabelsValue;
                 result.exclude_labels = args[i];
             } else if (std.mem.eql(u8, arg, "--parallel")) {
+                i += 1;
+                if (i >= args.len) return error.MissingParallelValue;
                 result.parallel = true;
+                result.degree_of_parallelism = std.fmt.parseInt(
+                    u32,
+                    args[i],
+                    10,
+                ) catch {
+                    std.debug.print(
+                        "Invalid value for --parallel: {s} (must be a positive integer)\n",
+                        .{args[i]},
+                    );
+                    return error.InvalidParallelValue;
+                };
             } else if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
                 return error.HelpRequested;
             } else {
@@ -99,30 +113,30 @@ pub const CliParser = struct {
 test "parse --parallel flag present" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
-    
+
     const args = [_][]const u8{ "chlogr", "--parallel" };
     const result = try parser.parse(&args);
-    
+
     try std.testing.expect(result.parallel == true);
 }
 
 test "parse --parallel flag absent" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
-    
+
     const args = [_][]const u8{ "chlogr", "--repo", "owner/repo" };
     const result = try parser.parse(&args);
-    
+
     try std.testing.expect(result.parallel == false);
 }
 
 test "parse --repo argument" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
-    
+
     const args = [_][]const u8{ "chlogr", "--repo", "owner/repo" };
     const result = try parser.parse(&args);
-    
+
     try std.testing.expect(result.repo != null);
     try std.testing.expectEqualStrings("owner/repo", result.repo.?);
 }
@@ -130,20 +144,20 @@ test "parse --repo argument" {
 test "parse --output argument" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
-    
+
     const args = [_][]const u8{ "chlogr", "--output", "HISTORY.md" };
     const result = try parser.parse(&args);
-    
+
     try std.testing.expectEqualStrings("HISTORY.md", result.output);
 }
 
 test "parse --since-tag argument" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
-    
+
     const args = [_][]const u8{ "chlogr", "--since-tag", "v1.0.0" };
     const result = try parser.parse(&args);
-    
+
     try std.testing.expect(result.since_tag != null);
     try std.testing.expectEqualStrings("v1.0.0", result.since_tag.?);
 }
@@ -151,10 +165,10 @@ test "parse --since-tag argument" {
 test "parse --until-tag argument" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
-    
+
     const args = [_][]const u8{ "chlogr", "--until-tag", "v2.0.0" };
     const result = try parser.parse(&args);
-    
+
     try std.testing.expect(result.until_tag != null);
     try std.testing.expectEqualStrings("v2.0.0", result.until_tag.?);
 }
@@ -162,10 +176,10 @@ test "parse --until-tag argument" {
 test "parse --exclude-labels argument" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
-    
+
     const args = [_][]const u8{ "chlogr", "--exclude-labels", "bug,wip" };
     const result = try parser.parse(&args);
-    
+
     try std.testing.expect(result.exclude_labels != null);
     try std.testing.expectEqualStrings("bug,wip", result.exclude_labels.?);
 }
@@ -173,30 +187,30 @@ test "parse --exclude-labels argument" {
 test "parse --help returns HelpRequested error" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
-    
+
     const args = [_][]const u8{ "chlogr", "--help" };
     const result = parser.parse(&args);
-    
+
     try std.testing.expectError(error.HelpRequested, result);
 }
 
 test "parse unknown argument returns UnknownArgument error" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
-    
+
     const args = [_][]const u8{ "chlogr", "--unknown" };
     const result = parser.parse(&args);
-    
+
     try std.testing.expectError(error.UnknownArgument, result);
 }
 
 test "parse --parallel combined with --repo and --output" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
-    
+
     const args = [_][]const u8{ "chlogr", "--parallel", "--repo", "owner/repo", "--output", "HISTORY.md" };
     const result = try parser.parse(&args);
-    
+
     try std.testing.expect(result.parallel == true);
     try std.testing.expect(result.repo != null);
     try std.testing.expectEqualStrings("owner/repo", result.repo.?);
