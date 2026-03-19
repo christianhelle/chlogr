@@ -10,6 +10,11 @@ fn parseDateToSlice(date_str: []const u8) []const u8 {
     return date_str;
 }
 
+fn isAuthorBot(entry: changelog_generator.ChangelogEntry) bool {
+    return (std.mem.count(u8, entry.author, "[bot]") > 0) or
+        (std.mem.count(u8, entry.author, "Copilot") > 0);
+}
+
 pub const MarkdownFormatter = struct {
     allocator: std.mem.Allocator,
     repo: []const u8,
@@ -80,9 +85,15 @@ pub const MarkdownFormatter = struct {
             for (un.sections) |section| {
                 try writer.print("### {s}\n", .{section.name});
                 for (section.entries) |entry| {
-                    try writer.print("- {s} ([#{d}]({s})) (@{s})\n", .{
-                        entry.title, entry.number, entry.url, entry.author,
-                    });
+                    if (!isAuthorBot(entry)) {
+                        try writer.print("- {s} ([#{d}]({s})) ([@{s}](https://github.com/{s}/))\n", .{
+                            entry.title, entry.number, entry.url, entry.author, entry.author,
+                        });
+                    } else {
+                        try writer.print("- {s} ([#{d}]({s})) (@{s})\n", .{
+                            entry.title, entry.number, entry.url, entry.author,
+                        });
+                    }
                 }
                 try writer.writeByte('\n');
             }
@@ -97,9 +108,15 @@ pub const MarkdownFormatter = struct {
             for (release.sections) |section| {
                 try writer.print("### {s}\n", .{section.name});
                 for (section.entries) |entry| {
-                    try writer.print("- {s} ([#{d}]({s})) (@{s})\n", .{
-                        entry.title, entry.number, entry.url, entry.author,
-                    });
+                    if (!isAuthorBot(entry)) {
+                        try writer.print("- {s} ([#{d}]({s})) ([@{s}](https://github.com/{s}/))\n", .{
+                            entry.title, entry.number, entry.url, entry.author, entry.author,
+                        });
+                    } else {
+                        try writer.print("- {s} ([#{d}]({s})) (@{s})\n", .{
+                            entry.title, entry.number, entry.url, entry.author,
+                        });
+                    }
                 }
                 try writer.writeByte('\n');
             }
