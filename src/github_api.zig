@@ -115,7 +115,11 @@ pub const GitHubApiClient = struct {
 
         while (true) {
             std.debug.print("  Fetching releases page {d}...\n", .{page});
-            const endpoint = try std.fmt.allocPrint(self.allocator, "/repos/{s}/releases?page={d}&per_page={d}", .{ self.repo, page, per_page });
+            const endpoint = try std.fmt.allocPrint(
+                self.allocator,
+                "/repos/{s}/releases?page={d}&per_page={d}",
+                .{ self.repo, page, per_page },
+            );
             defer self.allocator.free(endpoint);
 
             const response = try self.http_client.get(endpoint);
@@ -169,7 +173,11 @@ pub const GitHubApiClient = struct {
 
         while (true) {
             std.debug.print("  Fetching pull requests page {d}...\n", .{page});
-            const endpoint = try std.fmt.allocPrint(self.allocator, "/repos/{s}/pulls?state=closed&page={d}&per_page={d}&sort=updated&direction=desc", .{ self.repo, page, per_page });
+            const endpoint = try std.fmt.allocPrint(
+                self.allocator,
+                "/repos/{s}/pulls?state=closed&page={d}&per_page={d}&sort=updated&direction=desc",
+                .{ self.repo, page, per_page },
+            );
             defer self.allocator.free(endpoint);
 
             const response = try self.http_client.get(endpoint);
@@ -197,6 +205,61 @@ pub const GitHubApiClient = struct {
         }
 
         return try all_prs.toOwnedSlice(self.allocator);
+    }
+
+    pub fn getMergedPullRequestsByPage(self: *GitHubApiClient, page: u32) !PrsPaginationResult {
+        const per_page: u32 = 100;
+        var all_prs = try std.ArrayList(models.PullRequest).initCapacity(self.allocator, 0);
+        errdefer {
+            for (all_prs.items) |pr| {
+                self.allocator.free(pr.title);
+                if (pr.body) |b| self.allocator.free(b);
+                self.allocator.free(pr.html_url);
+                self.allocator.free(pr.user.login);
+                self.allocator.free(pr.user.html_url);
+                for (pr.labels) |l| {
+                    self.allocator.free(l.name);
+                    self.allocator.free(l.color);
+                }
+                self.allocator.free(pr.labels);
+                if (pr.merged_at) |m| self.allocator.free(m);
+            }
+            all_prs.deinit(self.allocator);
+        }
+
+        std.debug.print("  Fetching pull requests page {d}...\n", .{page});
+        const endpoint = try std.fmt.allocPrint(
+            self.allocator,
+            "/repos/{s}/pulls?state=closed&page={d}&per_page={d}&sort=updated&direction=desc",
+            .{ self.repo, page, per_page },
+        );
+        defer self.allocator.free(endpoint);
+
+        const response = try self.http_client.get(endpoint);
+        defer self.allocator.free(response.body);
+
+        if (response.status != .ok) {
+            return error.GitHubApiError;
+        }
+
+        var parsed = try std.json.parseFromSlice(
+            []models.PullRequest,
+            self.allocator,
+            response.body,
+            .{ .ignore_unknown_fields = true },
+        );
+        defer parsed.deinit();
+
+        const page_count = parsed.value.len;
+        for (parsed.value) |pr| {
+            try all_prs.append(self.allocator, try copyPullRequest(self.allocator, pr));
+        }
+
+        return PrsPaginationResult{
+            .has_more = page_count == per_page,
+            .prs = try all_prs.toOwnedSlice(self.allocator),
+            .prs_err = null,
+        };
     }
 
     /// Fetch closed issues
@@ -315,6 +378,28 @@ const PrsThreadCtx = struct {
     results: *ParallelFetchResults,
 };
 
+const PrsPaginationResult = struct {
+    has_more: bool = false,
+    prs: []models.PullRequest = &.{},
+    prs_err: ?anyerror = null,
+};
+
+const PrsPaginationThreadCtx = struct {
+    allocator: std.mem.Allocator,
+    token: []const u8,
+    repo: []const u8,
+    page: u32,
+    total_pages: u8,
+    result: *PrsPaginationResult,
+
+    pub fn deinit(self: PrsPaginationThreadCtx) void {
+        if (self.result.prs.len > 0) {
+            self.allocator.free(self.result.prs);
+        }
+        self.allocator.destroy(self.result);
+    }
+};
+
 fn releasesThreadFn(ctx: ReleasesThreadCtx) void {
     var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
     defer client.deinit();
@@ -327,10 +412,87 @@ fn releasesThreadFn(ctx: ReleasesThreadCtx) void {
 fn prsThreadFn(ctx: PrsThreadCtx) void {
     var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
     defer client.deinit();
-    ctx.results.prs = client.getMergedPullRequests() catch |err| {
+
+    const res = client.getMergedPullRequestsByPage(1) catch |err| {
         ctx.results.prs_err = err;
         return;
     };
+    ctx.results.prs = res.prs;
+    if (!res.has_more) {
+        return;
+    }
+
+    const dop: u32 = 4; // degree of parallelism - number of concurrent threads to fetch PR pages
+    var batch: u32 = 1;
+    var page: u32 = 2;
+
+    while (true) {
+        var idx: u32 = 0;
+        var threads: [dop]std.Thread = undefined;
+        var thread_ctxs: [dop]PrsPaginationThreadCtx = undefined;
+        while (idx < dop) {
+            const result_ptr = ctx.allocator.create(PrsPaginationResult) catch |err| {
+                ctx.results.prs_err = err;
+                return;
+            };
+            const thread_ctx = PrsPaginationThreadCtx{
+                .allocator = ctx.allocator,
+                .token = ctx.token,
+                .repo = ctx.repo,
+                .page = page,
+                .total_pages = dop,
+                .result = result_ptr,
+            };
+            thread_ctxs[idx] = thread_ctx;
+            threads[idx] = std.Thread.spawn(.{}, prsPaginationThreadFn, .{thread_ctx}) catch |err| {
+                ctx.results.prs_err = err;
+                return;
+            };
+            page += 1;
+            idx += 1;
+        }
+        batch += 1;
+
+        for (threads) |thread| {
+            thread.join();
+        }
+
+        for (thread_ctxs) |thread_ctx| {
+            if (thread_ctx.result.prs.len > 0) {
+                const existing = ctx.results.prs;
+                const incoming = thread_ctx.result.prs;
+                const merged = ctx.allocator.alloc(
+                    models.PullRequest,
+                    existing.len + incoming.len,
+                ) catch |err| {
+                    thread_ctx.deinit();
+                    for (thread_ctxs[idx + 1 ..]) |tc| {
+                        tc.deinit();
+                    }
+                    ctx.results.prs_err = err;
+                    return;
+                };
+                @memcpy(merged[0..existing.len], existing);
+                @memcpy(merged[existing.len..], incoming);
+                ctx.results.prs = merged;
+                ctx.allocator.free(existing);
+                thread_ctx.deinit();
+            } else {
+                thread_ctx.deinit();
+                return;
+            }
+        }
+    }
+}
+
+fn prsPaginationThreadFn(ctx: PrsPaginationThreadCtx) void {
+    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    defer client.deinit();
+    const res = client.getMergedPullRequestsByPage(ctx.page) catch |err| {
+        ctx.result.prs_err = err;
+        return;
+    };
+    ctx.result.prs = res.prs;
 }
 
 pub const ParallelFetcher = struct {
@@ -467,4 +629,3 @@ test "copyIssue cleans up on allocation failure" {
         try std.testing.expectError(error.OutOfMemory, copyIssue(fa.allocator(), src));
     }
 }
-
