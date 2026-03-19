@@ -87,3 +87,30 @@ All 5 issues (#27–#31) shipped via PRs #32–#36:
 | #36 | #31 | Fix progress output for parallel mode (`\r` → `\n`) |
 
 chlogr now supports `--parallel` for concurrent GitHub API data fetching. Sequential mode (default) unchanged. Series complete.
+
+## PR #38 — README Hygiene Rule (`docs/readme-hygiene-instructions`)
+
+**Review verdict:** Created for approval.  
+**Key observations:**
+- Added "README Hygiene" section to `.github/copilot-instructions.md` before Summary.
+- Defines what triggers a README update: new CLI flags, changed defaults, new output, removed features, updated options.
+- Specifies two acceptable workflows: update README in the same PR as the feature, OR in a dedicated docs/ branch immediately after feature PR merges.
+- Lists specific README sections to maintain: Features, Options, Usage examples, Development → Running Tests.
+- Updated Summary section with new bullet: "**README:** Update README.md for any user-facing feature change".
+- Commit message includes co-author trailer per squad standards.
+
+## Post-Sprint: PR #37 & #38 Merged to Main
+
+**Date:** 2026-03-19  
+**Status:** ✅ Both MERGED (squash merges)
+
+### PR #37: README parallel fetch documentation
+- Features, Options, Usage, Development sections updated
+- `--parallel` flag fully documented
+
+### PR #38: README hygiene governance
+- New maintainability rule in copilot-instructions
+- Defines triggers and workflows for README updates
+- Establishes team standard for documentation accuracy
+
+Full documentation and governance series complete. chlogr now has shipping parallel fetch feature + documented maintenance process.
