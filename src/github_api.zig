@@ -629,6 +629,13 @@ test "ParallelFetchResults default fields" {
     try std.testing.expect(r.prs_err == null);
 }
 
+test "PrsPaginationResult default fields" {
+    const r = PrsPaginationResult{};
+    try std.testing.expect(r.has_more == false);
+    try std.testing.expect(r.prs.len == 0);
+    try std.testing.expect(r.prs_err == null);
+}
+
 test "copyLabel cleans up on allocation failure" {
     const src = models.Label{ .name = "bug", .color = "d73a4a" };
     // 2 allocations: name, color

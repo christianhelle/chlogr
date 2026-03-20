@@ -235,3 +235,69 @@ test "parse --parallel with zero returns error" {
 
     try std.testing.expectError(error.InvalidParallelValue, result);
 }
+
+test "parse --parallel 1" {
+    const allocator = std.testing.allocator;
+    const parser = CliParser.init(allocator);
+
+    const args = [_][]const u8{ "chlogr", "--parallel", "1" };
+    const result = try parser.parse(&args);
+
+    try std.testing.expect(result.parallel == true);
+    try std.testing.expect(result.degree_of_parallelism == 1);
+}
+
+test "parse --parallel 32" {
+    const allocator = std.testing.allocator;
+    const parser = CliParser.init(allocator);
+
+    const args = [_][]const u8{ "chlogr", "--parallel", "32" };
+    const result = try parser.parse(&args);
+
+    try std.testing.expect(result.parallel == true);
+    try std.testing.expect(result.degree_of_parallelism == 32);
+}
+
+test "parse --parallel 64" {
+    const allocator = std.testing.allocator;
+    const parser = CliParser.init(allocator);
+
+    const args = [_][]const u8{ "chlogr", "--parallel", "64" };
+    const result = try parser.parse(&args);
+
+    try std.testing.expect(result.parallel == true);
+    try std.testing.expect(result.degree_of_parallelism == 64);
+}
+
+test "parse --parallel with missing value" {
+    const allocator = std.testing.allocator;
+    const parser = CliParser.init(allocator);
+
+    const args = [_][]const u8{ "chlogr", "--parallel" };
+    const result = parser.parse(&args);
+
+    try std.testing.expectError(error.MissingParallelValue, result);
+}
+
+test "parse --parallel with invalid value" {
+    const allocator = std.testing.allocator;
+    const parser = CliParser.init(allocator);
+
+    const args = [_][]const u8{ "chlogr", "--parallel", "abc" };
+    const result = parser.parse(&args);
+
+    try std.testing.expectError(error.InvalidParallelValue, result);
+}
+
+test "parse --repo owner/repo --parallel 10" {
+    const allocator = std.testing.allocator;
+    const parser = CliParser.init(allocator);
+
+    const args = [_][]const u8{ "chlogr", "--repo", "owner/repo", "--parallel", "10" };
+    const result = try parser.parse(&args);
+
+    try std.testing.expect(result.parallel == true);
+    try std.testing.expect(result.degree_of_parallelism == 10);
+    try std.testing.expect(result.repo != null);
+    try std.testing.expectEqualStrings("owner/repo", result.repo.?);
+}
