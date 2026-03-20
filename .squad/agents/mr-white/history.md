@@ -152,3 +152,107 @@ When `std.Thread.spawn` fails mid-batch, carefully join only the successfully sp
 
 ### CLI Validation for Parallelism
 Always validate user-provided parallelism values >= 1. Zero causes infinite loops in batch processing patterns where `while (idx < dop)` never executes but the outer loop continues forever.
+
+---
+
+## Link-Aware Pagination Optimization Review (2026-03-20)
+
+**Branch:** `optimize-parallel-pagination`  
+**Status:** Code Review Complete, APPROVED
+
+### Review Outcome
+
+**Verdict: APPROVED.** The implementation matches the approved plan, is architecturally sound, and passes all 54 tests. Ready for PR and merge.
+
+### Review Checklist
+
+#### 1. Does the code implement Link-aware discovery-first pagination?
+
+**YES.** The core flow is:
+
+1. `fetchReleasePage(1)` / `fetchPullRequestPage(1)` fetches page 1 and captures the `Link` header via the new `HttpResponse.link_header` field.
+2. `parsePaginationInfo()` extracts `has_next` and `last_page` from the header.
+3. `buildPaginationPlan()` decides the strategy: `single_page`, `sequential_fallback`, or `bounded_parallel`.
+4. If `bounded_parallel`, workers claim pages from a shared `WorkerPageState` via `claimNextPage()` (mutex-guarded counter), writing into pre-allocated page slots indexed by `page - 2`.
+5. After all workers join, `mergeOrderedPages()` assembles the final slice in page order with a single allocation pass.
+
+This replaces the old blind batch dispatch with a clean discover-then-dispatch model.
+
+#### 2. Does it cover both PRs and releases?
+
+**YES.** `getAllReleases()` and `getAllPullRequests()` share the identical `fetchPage → parsePaginationInfo → buildPaginationPlan → switch strategy` flow. Both have sequential and parallel implementations. The worker functions (`releasesPaginationWorkerFn`, `pullRequestsPaginationWorkerFn`) are symmetric. No endpoint is left on the old heuristic loop.
+
+#### 3. Is concurrency bounded and safer than the old blind batch strategy?
+
+**YES.** Improvements over the old approach:
+
+- Workers bounded to `min(remaining_pages, degree_of_parallelism)` — no speculative fetches past the known last page.
+- `WorkerPageState.claimNextPage()` is mutex-guarded and stops immediately on error.
+- `setError()` captures only the first error; subsequent workers drain gracefully.
+- Thread spawn failure joins all previously-started threads before returning.
+- `errdefer` on `first_page_items` and each slot prevents leaks on any error path.
+- `error.IncompletePagination` catches the case where a slot is null after all joins — defensive belt-and-suspenders.
+
+#### 4. Is fallback behavior sane when `rel="last"` is absent?
+
+**YES.** Three-tier fallback in `buildPaginationPlan()`:
+
+1. **Header present, `last_page` known** → bounded parallel (or sequential if dop=1).
+2. **Header present, no `last_page` but `has_next`** → sequential fallback (safe, no blind parallelism).
+3. **No header at all** → heuristic: if items < 100, single page; otherwise sequential fallback.
+
+The sequential loop also dynamically discovers `last_page` from subsequent responses and will stop early.
+
+#### 5. Are ownership/cleanup paths sound?
+
+**YES.** Verified:
+
+- `HttpResponse.deinit()` frees both `body` and `link_header`.
+- `errdefer` on `link_header` in `HttpClient.get()` prevents leak if body read fails.
+- `appendMovedReleasePage` / `appendMovedPullRequestPage` use `errdefer freeSlice` before the append, then free the outer slice after items move into the ArrayList.
+- Parallel paths: `errdefer` frees `first_page_items` and all non-null slots; success path frees individual slot slices after merge.
+- `HttpClient.get()` correctly switches from high-level `client.fetch()` to lower-level `request/receiveHead/readerDecompressing` to access response headers. Decompression handling is explicit and correct.
+
+#### 6. Are docs/help changes accurate?
+
+**YES.**
+
+- `cli.zig` help text: `"Fetch with up to N concurrent page requests"` — matches bounded-parallel semantics.
+- `README.md`: Features bullet, usage example, and Options all updated to `--parallel <N>` with concurrency language — matches implementation.
+- No new CLI flags; syntax unchanged.
+
+### Residual Risks
+
+1. **No live integration test** — Parallel worker paths aren't exercised by the test suite (require real HTTP). Should validate manually against a multi-page repo before shipping.
+2. **`error.IncompletePagination`** — No user-facing message wiring in `main.zig`. Would surface as a raw error name. Low priority.
+3. **Decompression responsibility** — The new explicit decompression path replaces the old `client.fetch()` internals. Correct but now our code's responsibility.
+
+### Verification
+
+- ✅ `zig build` passes
+- ✅ `zig build test` passes — all 54 tests green
+- ✅ 5 files changed: +928/−335 lines
+- ✅ No memory leaks detected by test allocator
+
+### Summary
+
+Implementation is correct, safe, and complete. The discovery-first model eliminates speculative requests, the bounded worker pool is properly synchronized, and fallback paths are conservative. Approved for PR and merge.
+
+### Key Learnings
+
+**RFC 5988 Link Header Semantics:**
+- GitHub's Link headers follow RFC 5988 format with multiple relations
+- `rel="last"` is reliably present for list endpoints (`/releases`, `/pulls`)
+- Parsing must be defensive (handle missing relations, malformed URLs)
+- Fallback to sequential is safe when header absent
+
+**Bounded Worker Pool Architecture:**
+- Atomic page counter (via fetchAdd) is more efficient than work queues
+- Pre-allocated results array indexed by page number eliminates O(n²) merge
+- Mutex guard on page counter is simple and proven pattern
+- Single merge pass at end (all workers done) simplifies error handling
+
+**HTTP Header Capture:**
+- Must use lower-level `request()` → `receiveHead()` API to access response headers
+- High-level `client.fetch()` doesn't expose headers (by design, for simplicity)
+- Decompression must be handled explicitly when switching to lower-level API

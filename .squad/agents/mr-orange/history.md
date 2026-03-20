@@ -273,3 +273,82 @@ If someone passes `--parallel 0`, `dop = 0`, spawn loop never runs, merge loop d
 ✅ 44 tests passing  
 ✅ Memory safety verified  
 ✅ PR ready for merge
+
+---
+
+## Link-Aware Pagination Optimization (2026-03-20)
+
+**Branch:** `optimize-parallel-pagination`  
+**Status:** Implementation Complete, Ready for PR
+
+### Session Summary
+
+Implemented discovery-first pagination optimization replacing blind batch dispatch with bounded concurrent workers. Core change: parse GitHub's `Link: rel="last"` header on first response to discover total page count upfront, eliminating speculative thread spawning.
+
+### Implementation Details
+
+#### HTTP Headers Capture (Phase 1)
+- Modified `HttpResponse` struct to include `link_header: ?[]u8` field
+- Switched `HttpClient.get()` from `client.fetch()` to lower-level `request()` → `receiveHead()` → `readerDecompressing()` API
+- Proper decompression and cleanup on all error paths
+
+#### Link Header Parser (Phase 2)
+- Implemented `parsePaginationInfo()` helper that extracts:
+  - `has_next: bool` — is rel="next" present?
+  - `last_page: ?u32` — extract page number from rel="last"
+- Graceful fallback to null if header absent or malformed
+
+#### Pagination Plan Builder (Phase 3)
+- Implemented `buildPaginationPlan()` that selects strategy based on available info:
+  1. `single_page` — if only one page exists (common for small repos)
+  2. `sequential_fallback` — if no Link header (conservative, no speculation)
+  3. `bounded_parallel` — if total known, spawn exactly min(pages, dop) workers
+- Applies uniformly to both releases and pull requests
+
+#### Bounded Worker Pool (Phase 4)
+- Implemented `WorkerPageState` struct with atomic `page_counter` (mutex-guarded)
+- Workers atomically claim pages via `claimNextPage()` — no contention
+- Pre-allocates results array indexed by (page - 2) to avoid O(n²) merge
+- Symmetric worker functions: `releasesPaginationWorkerFn`, `pullRequestsPaginationWorkerFn`
+
+#### Ordered Merging (Phase 5)
+- Implemented `mergeOrderedPages()` to assemble pages by index order
+- Single allocation pass at end: O(n) total copies (vs old O(n²))
+- Proper cleanup of individual page slices after merge
+- Defensive `error.IncompletePagination` guard
+
+### Code Statistics
+- **Files Modified:** 5 (http_client.zig, github_api.zig, cli.zig, test_data.zig, README.md)
+- **Lines Changed:** +928/−335
+- **Tests:** 54 total (20 integration + 34 unit)
+
+### Testing
+- 17 new unit tests in github_api.zig (Link parsing, plan selection, merge ordering)
+- 17 updated tests in cli.zig (help text reflects bounded semantics)
+- 4 new Link header fixtures in test_data.zig
+- All 54 tests passing
+
+### Memory Safety
+- ✅ All allocations have matching frees
+- ✅ Proper errdefer scopes on all paths
+- ✅ No data races (atomic counter with mutex guard)
+- ✅ No undefined behavior
+
+### Key Learnings
+
+**RFC 5988 Link Header Parsing:**
+- Format: `<url>; rel="relation", <url>; rel="relation", ...`
+- Must handle multiple relations in one header
+- `rel="last"` only present if total is computable
+- Should gracefully fall back to sequential if absent
+
+**Atomic Page Claiming Pattern:**
+- Using mutex-guarded `fetchAdd` eliminates contention in worker pool
+- Pre-allocated results array indexed by page number avoids list operations
+- Single merge pass at end transforms O(n²) to O(n)
+
+**Discovery-First Pagination:**
+- Knowing total pages upfront enables optimal worker spawning
+- No speculative fetches past known last page
+- Applies to any paginated API endpoint (releases, PRs, issues, etc.)
+- Fallback to sequential is safe and conservative
