@@ -5,6 +5,9 @@ on:
     branches: [main]
   push:
     branches: [main]
+    paths:
+      - ".github/workflows/ci.yml"
+      - "**/*.zig"
 
 jobs:
   build-and-test:
