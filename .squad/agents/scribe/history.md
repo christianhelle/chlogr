@@ -55,3 +55,55 @@ Initial setup complete.
 - **Squad detection patterns** — Multi-signal detection (branch name + convention + agent) is more reliable than single signals
 - **Decision documentation** — Capture not just the decision, but the problem context and future extensibility considerations
 - **History maintenance** — Keep agent histories focused on work done and learnings extracted, not process notes
+
+---
+
+## Session: Closed PR Metadata Batch 4 Documentation
+
+**Date:** 2026-03-20
+**Tasks:** Merge Mr. Blonde batch 4 work into squad records (7 steps)
+
+### Work Completed
+
+1. **Orchestration log** — Created `.squad/orchestration-log/2026-03-20T07-38-32-mr-blonde-batch-4.md`
+   - Documents batch 4 execution, metrics, and deliverables
+   - Timestamp: ISO 8601 UTC format
+
+2. **Session log** — Created `.squad/log/2026-03-20T07-38-32-closed-pr-metadata-sync.md`
+   - Full request description, execution steps, outcomes
+   - Files modified/created/deleted
+
+3. **Decision merge** — Integrated inbox decision into `.squad/decisions.md`
+   - Merged 82-line decision document "Closed PR Metadata Sync"
+   - Covers problem, decision, solution, findings, reusable pattern, metrics, future considerations
+   - Deleted inbox file after successful merge
+
+4. **Mr. Blonde history** — Appended session summary under ## Learnings
+   - Session title, work completed, key findings, metrics, learnings summary
+   - Captures batch 4 work flow and GitHub CLI quirks discovered
+
+5. **Scribe history** — This entry under ## Learnings
+   - Documents orchestration work and files touched
+   - Captures 7-step workflow execution
+
+### Files Modified
+
+- **Created:**
+  - `.squad/orchestration-log/2026-03-20T07-38-32-mr-blonde-batch-4.md`
+  - `.squad/log/2026-03-20T07-38-32-closed-pr-metadata-sync.md`
+
+- **Updated:**
+  - `.squad/decisions.md` — merged "Closed PR Metadata Sync" decision (new section after "PR Metadata Workflow Permissions Fix")
+  - `.squad/agents/mr-blonde/history.md` — appended batch 4 session summary
+  - `.squad/agents/scribe/history.md` — this entry
+
+- **Deleted:**
+  - `.squad/decisions/inbox/mr-blonde-closed-pr-metadata.md`
+
+### Key Learnings
+
+- **Scribe is orchestrator** — Reads charter, executes multi-step merge/documentation workflows, documents progress
+- **Timestamp hygiene** — ISO 8601 UTC timestamps in filenames enable chronological sorting and traceability
+- **Decision merge pattern** — Inbox → main decisions file is clean separation of "under consideration" vs "established"
+- **History layering** — Both Mr. Blonde and Scribe histories document their own work; Scribe documents Mr. Blonde's outputs
+- **7-step workflow** — Systematic orchestration (logs, decisions, histories, git) keeps squad records clean and organized

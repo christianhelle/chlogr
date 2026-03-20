@@ -156,6 +156,128 @@ Most PR automation workflows need `issues: write`, not `pull-requests: write`.
 
 ---
 
+### Closed PR Metadata Sync
+
+**Author:** Mr. Blonde (DevOps/Release)  
+**Date:** 2026-03-20  
+**Status:** Complete  
+**Related:** `.squad/agents/mr-blonde/history.md` (Session: Closed PR Metadata Audit and Sync)
+
+#### Problem
+
+After setting up automated PR labeling for *new* squad PRs (via `pr-squad-metadata.yml`), we realized that *existing* closed PRs lacked the `enhancement` label and `christianhelle` assignment. This created an inconsistency in the PR backlog:
+- New squad PRs would be auto-labeled and auto-assigned
+- Old squad PRs (1–41) had no consistent metadata
+
+#### Decision
+
+Implement a one-time audit and bulk sync of all closed PRs by project author `christianhelle` to ensure they all have:
+1. **Label:** `enhancement`
+2. **Assignee:** `christianhelle`
+
+This ensures historical consistency and sets a baseline for future automation.
+
+#### Solution Implemented
+
+**Tool:** GitHub CLI (`gh pr edit`)
+
+**Scope:** All closed PRs by `christianhelle` (27 PRs total)
+
+**Operations:**
+```bash
+gh pr edit <number> --add-label enhancement --add-assignee christianhelle
+```
+
+**Batching Strategy:**
+- Batch 1: PRs #13–24, #26 (12 PRs)
+- Batch 2: PRs #32–38, #40–41 (9 PRs)
+- Batch 3: PRs #2, #25 (missing assignment only)
+
+**Result:** ✅ All 27 closed PRs now have both label and assignee
+
+#### Key Findings
+
+##### Label Already Existed
+
+The `enhancement` label was already properly defined (from prior `sync-squad-labels.yml` work):
+- **Color:** `a2eeef` (GitHub standard cyan)
+- **Description:** "New feature or request"
+
+No label creation needed.
+
+##### Idempotency Pattern
+
+The `gh pr edit --add-label` and `--add-assignee` flags are **idempotent**:
+- Running the same command twice produces the same result (no duplicates)
+- This makes bulk operations safe for reruns and corrections
+- If a subset of PRs are missed, re-running captures them automatically
+
+##### GitHub API Namespace Quirk
+
+PR labels and assignees use the `issues.*` API namespace, not `pull-requests.*`:
+- This is why workflows need `issues: write` permission
+- This is consistent with GitHub's internal model (PRs as specialized issues)
+- Label operations on PRs route through the issues API
+
+#### Reusable Pattern: Bulk PR Metadata Sync
+
+**When to use:**
+- Backfilling metadata on existing PRs after establishing automation standards
+- Syncing PR assignments when project ownership changes
+- Ensuring historical consistency in PR tags/labels
+
+**How to replicate:**
+
+1. **Verify label exists** (query GitHub API or check in UI):
+   ```bash
+   gh label list --repo owner/repo
+   ```
+
+2. **Get list of PRs to update** (example: closed by user):
+   ```bash
+   gh pr list --state closed --author username --repo owner/repo --json number
+   ```
+
+3. **Batch update** (PowerShell example for Windows):
+   ```powershell
+   $prs = 1, 2, 3, ... 27
+   foreach ($pr in $prs) {
+     gh pr edit $pr --repo owner/repo --add-label label-name --add-assignee username
+   }
+   ```
+
+4. **Verify completion**:
+   ```bash
+   gh pr list --state closed --author username --repo owner/repo \
+     --json number,labels,assignees | \
+     jq '.[] | select(.labels[].name != "label-name")'
+   ```
+
+**Cost:** Low (transparent rate limiting via `gh` CLI)
+
+#### Metrics
+
+| Metric | Value |
+|--------|-------|
+| Total PRs audited | 27 |
+| PRs updated | 25 |
+| PRs already complete | 2 |
+| API calls made | ~54 |
+| Errors | 0 |
+| Time to completion | ~2 min |
+
+#### Future Considerations
+
+1. **Automation for future PRs** — The existing `pr-squad-metadata.yml` workflow now handles new squad PRs automatically. This one-time sync was for historical consistency.
+
+2. **Detection of unlabeled PRs** — Could add a periodic GitHub Actions workflow to detect PRs missing expected metadata and report (read-only audit).
+
+3. **Bulk operations at scale** — This pattern works well for 25–50 PRs. For 500+ PRs, consider:
+   - GitHub GraphQL API for parallel queries
+   - Batch job approach (e.g., `.github/workflows/bulk-pr-metadata.yml` triggered manually)
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
