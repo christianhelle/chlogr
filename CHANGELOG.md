@@ -7,6 +7,7 @@
 - docs: add README hygiene rule to copilot instructions ([#38](https://github.com/christianhelle/chlogr/pull/38)) ([@christianhelle](https://github.com/christianhelle/))
 
 ### Features
+- feat: optimize parallel pagination with link-aware discovery ([#42](https://github.com/christianhelle/chlogr/pull/42)) ([@christianhelle](https://github.com/christianhelle/))
 - fix: support arbitrary degree of parallelism in parallel PR fetcher ([#41](https://github.com/christianhelle/chlogr/pull/41)) ([@christianhelle](https://github.com/christianhelle/))
 - feat: show per-fetcher progress in parallel mode ([#36](https://github.com/christianhelle/chlogr/pull/36)) ([@christianhelle](https://github.com/christianhelle/))
 - feat: wire --parallel flag into main.zig fetch path ([#35](https://github.com/christianhelle/chlogr/pull/35)) ([@christianhelle](https://github.com/christianhelle/))
