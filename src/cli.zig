@@ -101,7 +101,7 @@ pub const CliParser = struct {
             \\  --since-tag <tag>        Start from this tag/version
             \\  --until-tag <tag>       End at this tag/version
             \\  --exclude-labels <csv>   Comma-separated labels to exclude
-            \\  --parallel <N>           Fetch with N parallel page requests (default: 4)
+            \\  --parallel <N>           Fetch with up to N concurrent page requests (default: 4)
             \\  --help, -h               Show this help message
             \\
             \\Examples:
