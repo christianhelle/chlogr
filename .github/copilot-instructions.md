@@ -60,6 +60,12 @@ All tests must pass. No exceptions.
 6. **Wait for review** — PRs must be reviewed and approved before merging
 7. **Merge and delete branch** — Clean up after merge
 
+**PR Automation:**
+- Squad member PRs (branches matching `feature/`, `fix/`, `docs/`, `chore/`, `refactor/`, `test/`, or containing squad member names) automatically get:
+  - `enhancement` label applied
+  - Assigned to `christianhelle`
+- This happens via the `pr-squad-metadata.yml` workflow on PR open/reopen
+
 **PR Template:**
 ```
 Closes #N
