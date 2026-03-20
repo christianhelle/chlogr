@@ -68,6 +68,13 @@ pub const CliParser = struct {
                     );
                     return error.InvalidParallelValue;
                 };
+                if (result.degree_of_parallelism == 0) {
+                    std.debug.print(
+                        "Invalid value for --parallel: {s} (must be at least 1)\n",
+                        .{args[i]},
+                    );
+                    return error.InvalidParallelValue;
+                }
             } else if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
                 return error.HelpRequested;
             } else {
@@ -94,7 +101,7 @@ pub const CliParser = struct {
             \\  --since-tag <tag>        Start from this tag/version
             \\  --until-tag <tag>       End at this tag/version
             \\  --exclude-labels <csv>   Comma-separated labels to exclude
-            \\  --parallel               Fetch releases and pull requests concurrently
+            \\  --parallel <N>           Fetch with N parallel page requests (default: 4)
             \\  --help, -h               Show this help message
             \\
             \\Examples:
@@ -114,10 +121,11 @@ test "parse --parallel flag present" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
 
-    const args = [_][]const u8{ "chlogr", "--parallel" };
+    const args = [_][]const u8{ "chlogr", "--parallel", "4" };
     const result = try parser.parse(&args);
 
     try std.testing.expect(result.parallel == true);
+    try std.testing.expect(result.degree_of_parallelism == 4);
 }
 
 test "parse --parallel flag absent" {
@@ -208,11 +216,22 @@ test "parse --parallel combined with --repo and --output" {
     const allocator = std.testing.allocator;
     const parser = CliParser.init(allocator);
 
-    const args = [_][]const u8{ "chlogr", "--parallel", "--repo", "owner/repo", "--output", "HISTORY.md" };
+    const args = [_][]const u8{ "chlogr", "--parallel", "8", "--repo", "owner/repo", "--output", "HISTORY.md" };
     const result = try parser.parse(&args);
 
     try std.testing.expect(result.parallel == true);
+    try std.testing.expect(result.degree_of_parallelism == 8);
     try std.testing.expect(result.repo != null);
     try std.testing.expectEqualStrings("owner/repo", result.repo.?);
     try std.testing.expectEqualStrings("HISTORY.md", result.output);
+}
+
+test "parse --parallel with zero returns error" {
+    const allocator = std.testing.allocator;
+    const parser = CliParser.init(allocator);
+
+    const args = [_][]const u8{ "chlogr", "--parallel", "0" };
+    const result = parser.parse(&args);
+
+    try std.testing.expectError(error.InvalidParallelValue, result);
 }
