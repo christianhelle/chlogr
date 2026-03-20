@@ -420,18 +420,26 @@ fn prsThreadFn(ctx: PrsThreadCtx) void {
 
     while (true) {
         var idx: u32 = 0;
-        var threads: [32]std.Thread = undefined;
-        var thread_ctxs: [32]PrsPaginationThreadCtx = undefined;
+        var threads = std.ArrayList(std.Thread).initCapacity(ctx.allocator, 0) catch |err| {
+            ctx.results.prs_err = err;
+            return;
+        };
+        defer threads.deinit(ctx.allocator);
+        var thread_ctxs = std.ArrayList(PrsPaginationThreadCtx).initCapacity(ctx.allocator, 0) catch |err| {
+            ctx.results.prs_err = err;
+            return;
+        };
+        defer thread_ctxs.deinit(ctx.allocator);
         var active_count: u32 = 0;
 
         errdefer {
             var i: u32 = 0;
             while (i < active_count) : (i += 1) {
-                threads[i].join();
+                threads.items[i].join();
             }
             var j: u32 = 0;
             while (j < active_count) : (j += 1) {
-                thread_ctxs[j].deinit();
+                thread_ctxs.items[j].deinit();
             }
         }
 
@@ -448,17 +456,30 @@ fn prsThreadFn(ctx: PrsThreadCtx) void {
                 .total_pages = dop,
                 .result = result_ptr,
             };
-            thread_ctxs[idx] = thread_ctx;
-            threads[idx] = std.Thread.spawn(.{}, prsPaginationThreadFn, .{thread_ctx}) catch |err| {
-                thread_ctx.deinit();
+            thread_ctxs.append(ctx.allocator, thread_ctx) catch |err| {
+                ctx.allocator.destroy(result_ptr);
+                ctx.results.prs_err = err;
+                return;
+            };
+            const thread = std.Thread.spawn(.{}, prsPaginationThreadFn, .{thread_ctx}) catch |err| {
+                // Join all successfully spawned threads
                 var i: u32 = 0;
                 while (i < idx) : (i += 1) {
-                    threads[i].join();
+                    threads.items[i].join();
                 }
+                // Free all result_ptrs including the one just created (at idx)
                 var j: u32 = 0;
-                while (j <= idx) : (j += 1) {
-                    thread_ctxs[j].deinit();
+                while (j < idx) : (j += 1) {
+                    thread_ctxs.items[j].deinit();
                 }
+                // Free the result_ptr we just created but couldn't spawn
+                thread_ctxs.items[idx].deinit();
+                ctx.results.prs_err = err;
+                return;
+            };
+            threads.append(ctx.allocator, thread) catch |err| {
+                // The thread was spawned successfully but we can't track it
+                // This is a serious error - we can't join it later
                 ctx.results.prs_err = err;
                 return;
             };
@@ -470,13 +491,16 @@ fn prsThreadFn(ctx: PrsThreadCtx) void {
 
         var ti: u32 = 0;
         while (ti < active_count) : (ti += 1) {
-            threads[ti].join();
+            threads.items[ti].join();
         }
 
         var i: u32 = 0;
         while (i < active_count) : (i += 1) {
-            const tc = &thread_ctxs[i];
-            if (tc.result.prs.len > 0) {
+            const tc = &thread_ctxs.items[i];
+            const has_more = tc.result.has_more;
+            const prs_len = tc.result.prs.len;
+            
+            if (prs_len > 0) {
                 const existing = ctx.results.prs;
                 const incoming = tc.result.prs;
                 const merged = ctx.allocator.alloc(
@@ -485,7 +509,7 @@ fn prsThreadFn(ctx: PrsThreadCtx) void {
                 ) catch |err| {
                     var j: u32 = i + 1;
                     while (j < active_count) : (j += 1) {
-                        thread_ctxs[j].deinit();
+                        thread_ctxs.items[j].deinit();
                     }
                     ctx.results.prs_err = err;
                     return;
@@ -495,7 +519,22 @@ fn prsThreadFn(ctx: PrsThreadCtx) void {
                 ctx.results.prs = merged;
                 ctx.allocator.free(existing);
                 tc.deinit();
+                
+                // Stop if this page indicated no more pages
+                if (!has_more) {
+                    // Free remaining ctxs
+                    var j: u32 = i + 1;
+                    while (j < active_count) : (j += 1) {
+                        thread_ctxs.items[j].deinit();
+                    }
+                    return;
+                }
             } else {
+                // Free remaining ctxs before returning
+                var j: u32 = i + 1;
+                while (j < active_count) : (j += 1) {
+                    thread_ctxs.items[j].deinit();
+                }
                 tc.deinit();
                 return;
             }
@@ -511,6 +550,7 @@ fn prsPaginationThreadFn(ctx: PrsPaginationThreadCtx) void {
         return;
     };
     ctx.result.prs = res.prs;
+    ctx.result.has_more = res.has_more;
 }
 
 pub const ParallelFetcher = struct {
