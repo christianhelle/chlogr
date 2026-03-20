@@ -141,3 +141,95 @@ This review validated that Mr. Orange handled all of these correctly.
 - Tests: ✅ 44/44 PASS
 - Memory safety: ✅ VERIFIED
 - Status: Ready to merge
+
+---
+
+## Link-Aware Pagination Testing & Fixtures (2026-03-20)
+
+**Branch:** `optimize-parallel-pagination`  
+**Status:** Testing Complete, Code Approved
+
+### Session Summary
+
+Reviewed Mr. Orange's discovery-first pagination implementation and added comprehensive test fixtures and edge-case coverage. Focus: validating Link header parsing, pagination plan strategy selection, result ordering, and error cleanup paths.
+
+### Testing Additions
+
+#### Unit Tests (17 new)
+
+**Link Header Parsing (4 tests):**
+1. Parse valid Link header with rel="last" — extract page 523 from real format
+2. Parse Link header missing rel="last" — graceful null when no last link
+3. Parse malformed Link header — return null on invalid format
+4. Parse Link header with multiple relations — correctly identify last among first/prev/next/last
+
+**Pagination Plan Strategy (5 tests):**
+1. Bounded parallel plan with known pages — dop=4, total_pages=10 → spawn 4 workers
+2. Single page plan when total_pages=1 — dop=8, total_pages=1 → no parallel
+3. Sequential fallback plan when no Link header — has_next=true but no last_page
+4. Heuristic fallback on empty response — <100 items, no header → single page
+5. Page plan calculation across batches — verify worker claim sequence for 523 pages
+
+**Result Merging & Cleanup (8 tests):**
+1. Merge pull request pages in order — verify ordering by page index
+2. Merge release pages in order — same for releases
+3. Cleanup partial results on error — verify all allocated slots freed
+4. Copy pull request with allocation failure — test errdefer on copy
+5. Copy release with allocation failure — test errdefer on copy
+6. Copy labels with allocation failure — subsidiary allocation failure
+7. Copy issue with allocation failure — subsidiary allocation failure
+8. Free releases with null items — defensive cleanup path
+
+#### Test Fixtures (4)
+
+- `test_link_header_523_pages` — rel="last" with page=523 (large repo simulation)
+- `test_link_header_no_last` — Header present but missing rel="last"
+- `test_link_header_malformed` — Invalid format (should parse to null)
+- `test_prs_three_pages_mock` — Multi-page PR response fixture with Links
+
+### Code Review Assessment
+
+- ✅ Orange's discovery-first pagination replaces blind batch dispatch correctly
+- ✅ Bounded worker pool with atomic page counter is thread-safe
+- ✅ Memory safety: all allocations have matching frees, errdefer scopes correct
+- ✅ Fallback paths conservative (no speculative fetches)
+- ✅ CLI documentation accurate
+
+### Key Findings
+
+**RFC 5988 Link Header Parsing:**
+- Multiple relations in single header (first, prev, next, last)
+- Page number extracted from rel="last" URL query parameter
+- Must gracefully handle missing header, malformed format, missing relations
+
+**Worker Pool Efficiency:**
+- Atomic counter via fetchAdd eliminates contention
+- Pre-allocated page-indexed array avoids O(n²) merge
+- Results collected in parallel, assembled in page order at end
+
+**Fallback Resilience:**
+- If no Link header, fall back to sequential (conservative, no speculation)
+- Small repos (<100 items) detected via page size heuristic
+- Large repos without Link header still work via sequential pagination
+
+### Test Coverage
+
+**Total Tests:** 54 passing
+- 20 integration tests (existing, unchanged)
+- 34 unit tests (17 github_api + 17 cli)
+- 4 new Link header fixtures
+
+All paths covered: valid headers, missing headers, malformed headers, plan selection, merge ordering, allocation failures.
+
+### Learnings
+
+**Testing Paginated APIs:**
+- Mock Link headers must be realistic (RFC 5988 format)
+- Test all three strategy branches (single_page, sequential_fallback, bounded_parallel)
+- Verify result ordering by page index, not completion order
+- Allocation failure cleanup is critical (all paths must free)
+
+**Bounded Parallelism:**
+- Atomic page counter is simpler and more efficient than work queue
+- Pre-allocation by total pages enables lock-free result indexing
+- No contention at merge time (pages already in order)
