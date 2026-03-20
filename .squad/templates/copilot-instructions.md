@@ -37,6 +37,11 @@ When opening a PR:
 - If this is a 🟡 needs-review task, add to the PR description: `⚠️ This task was flagged as "needs review" — please have a squad member review before merging.`
 - Follow any project conventions in `.squad/decisions.md`
 
+**PR Automation:** Squad member PRs are automatically:
+- Labeled with `enhancement`
+- Assigned to the project maintainer
+This is handled by the `pr-squad-metadata.yml` workflow.
+
 ## Decisions
 
 If you make a decision that affects other team members, write it to:

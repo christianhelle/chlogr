@@ -1,0 +1,124 @@
+name: PR Squad Metadata
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  label-and-assign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add enhancement label and assign to christianhelle
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Check if this PR was created by a squad member (branch pattern or bot)
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+            const branch = pr.head.ref;
+            
+            core.info(`PR #${pr.number} by ${author} from branch ${branch}`);
+            
+            // Check if .squad/team.md exists
+            let teamFile = '.squad/team.md';
+            if (!fs.existsSync(teamFile)) {
+              teamFile = '.ai-team/team.md';
+            }
+            
+            if (!fs.existsSync(teamFile)) {
+              core.info('No team file found — skipping metadata automation');
+              return;
+            }
+            
+            const teamContent = fs.readFileSync(teamFile, 'utf8');
+            
+            // Parse squad members from the Members table
+            const members = [];
+            let inMembersTable = false;
+            for (const line of teamContent.split('\n')) {
+              if (line.match(/^##\s+(Members|Team Roster)/i)) {
+                inMembersTable = true;
+                continue;
+              }
+              if (inMembersTable && line.startsWith('## ')) {
+                break;
+              }
+              if (inMembersTable && line.startsWith('|') && !line.includes('---') && !line.includes('Name')) {
+                const cells = line.split('|').map(c => c.trim()).filter(Boolean);
+                if (cells.length >= 2 && cells[0] !== 'Scribe' && cells[0] !== 'Ralph') {
+                  members.push(cells[0].toLowerCase());
+                }
+              }
+            }
+            
+            // Check if @copilot is on the team
+            const hasCopilot = teamContent.includes('🤖 Coding Agent');
+            
+            core.info(`Squad members: ${members.join(', ')}`);
+            core.info(`Has @copilot: ${hasCopilot}`);
+            
+            // Determine if this PR is from a squad member
+            let isSquadPR = false;
+            
+            // Check 1: Branch name contains a squad member name
+            const branchLower = branch.toLowerCase();
+            for (const member of members) {
+              if (branchLower.includes(member)) {
+                isSquadPR = true;
+                core.info(`Branch contains squad member name: ${member}`);
+                break;
+              }
+            }
+            
+            // Check 2: Branch starts with feature/ or fix/ (squad convention)
+            if (branchLower.startsWith('feature/') || branchLower.startsWith('fix/') || 
+                branchLower.startsWith('docs/') || branchLower.startsWith('chore/') || 
+                branchLower.startsWith('refactor/') || branchLower.startsWith('test/')) {
+              isSquadPR = true;
+              core.info('Branch follows squad naming convention');
+            }
+            
+            // Check 3: Author is copilot-swe-agent or copilot
+            if (hasCopilot && (author === 'copilot-swe-agent[bot]' || author === 'copilot' || author.includes('copilot'))) {
+              isSquadPR = true;
+              core.info('PR created by Copilot agent');
+            }
+            
+            if (!isSquadPR) {
+              core.info('PR not from squad member — skipping metadata automation');
+              return;
+            }
+            
+            // Add 'enhancement' label
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['enhancement']
+              });
+              core.info('✅ Added enhancement label');
+            } catch (err) {
+              core.warning(`Could not add label: ${err.message}`);
+            }
+            
+            // Assign to christianhelle
+            try {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                assignees: ['christianhelle']
+              });
+              core.info('✅ Assigned to christianhelle');
+            } catch (err) {
+              core.warning(`Could not assign PR: ${err.message}`);
+            }
