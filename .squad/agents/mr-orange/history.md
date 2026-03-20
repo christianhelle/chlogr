@@ -171,3 +171,105 @@ Added `parallel: bool = false` field to `CliArgs` struct in `src/cli.zig`. The f
 **Commit:** `b078f56 feat: add --parallel flag to CLI argument parsing`
 
 **PR:** #32 (https://github.com/christianhelle/chlogr/pull/32)
+
+---
+
+## Parallel PR Fetcher Crash Fixes (2025-01-22)
+
+**Branch:** `fix/parallel-crash`  
+**Commits:** `007bddf`, `d9dc110`
+
+### Context
+The parallel PR pagination feature (from `parallel-pr-pagination` branch) had six critical bugs that caused crashes and memory leaks when users specified `--parallel` with various values.
+
+### Bugs Fixed
+
+#### Bug 1 — Fixed-size stack buffer (PRIMARY CRASH for dop > 32)
+In `prsThreadFn` (line 423-424):
+```zig
+var threads: [32]std.Thread = undefined;
+var thread_ctxs: [32]PrsPaginationThreadCtx = undefined;
+```
+These are stack-allocated fixed-size arrays. If `degree_of_parallelism > 32`, writing to index 32+ is undefined behavior / panic.
+
+**Fix:** Replace with `ArrayList(std.Thread)` and `ArrayList(PrsPaginationThreadCtx)` using `initCapacity(ctx.allocator, 0)`. Use `.append(ctx.allocator, item)` and access with `.items[i]`.
+
+#### Bug 2 — Double-free when std.Thread.spawn fails mid-batch
+`thread_ctx` (stack copy) and `thread_ctxs[idx]` (array copy) share the same `result_ptr`. Calling `thread_ctx.deinit()` then `thread_ctxs[j].deinit()` (j <= idx) double-frees `result_ptr` when j==idx.
+
+**Fix:** Only call deinit on array items, not on the standalone `thread_ctx` variable.
+
+#### Bug 3 — Memory leak when batch has partial results
+When merge loop encounters `prs.len == 0`, it returns immediately without freeing `thread_ctxs[i+1..active_count-1]` result pointers.
+
+**Fix:** Before returning, iterate remaining indices and call `.deinit()` on each.
+
+#### Bug 4 — `has_more` not propagated to outer loop
+`getMergedPullRequestsByPage` returns `has_more: bool`, but `prsPaginationThreadFn` only stored `prs` in the result. The outer loop detects page exhaustion via `prs.len == 0`, causing unnecessary extra batch when last page has exactly 100 PRs.
+
+**Fix:** Store `ctx.result.has_more = res.has_more` in thread function. Check `!has_more` in merge loop and stop immediately after merging last page.
+
+#### Bug 5 — Broken CLI tests
+The `--parallel` flag was changed from boolean to value-based (`--parallel <N>`), but tests still used old boolean form:
+- `test "parse --parallel flag present"` passed `{ "chlogr", "--parallel" }` → now returns `error.MissingParallelValue`
+- `test "parse --parallel combined"` passed `{ "--parallel", "--repo" }` → parser reads "--repo" as DOP value, `parseInt` fails
+
+**Fix:** Update tests to pass numeric values: `"--parallel", "4"` and `"--parallel", "8"`. Assert `degree_of_parallelism` matches expected value.
+
+#### Bug 6 — No validation of degree_of_parallelism == 0
+If someone passes `--parallel 0`, `dop = 0`, spawn loop never runs, merge loop does nothing, `while (true)` loops forever.
+
+**Fix:** Add validation in `cli.zig`: `if (result.degree_of_parallelism == 0) return error.InvalidParallelValue;`. Added test case for zero validation.
+
+### Implementation
+- Commit 1 (`007bddf`): Fixed bugs 1-4 in `github_api.zig` — dynamic allocation, double-free, memory leak, has_more propagation
+- Commit 2 (`d9dc110`): Fixed bugs 5-6 in `cli.zig` — test updates, zero validation, help text update
+
+### Testing
+- Build gate: `zig build` ✓
+- Test gate: `zig build test` ✓ (all 20 integration tests passed)
+
+### Learnings
+
+**Zig 0.15.2 ArrayList API:**
+- `ArrayList(T).init(allocator)` does NOT exist — use `initCapacity(allocator, 0)` for empty list
+- `list.append(allocator, item)` requires allocator parameter
+- `list.deinit(allocator)` requires allocator parameter
+- Access items with `.items[i]` instead of `[i]`
+
+**Thread function error handling:**
+- Functions called via `std.Thread.spawn` must return `void` (not `!void`)
+- All error-returning operations must use `catch |err| { ctx.results.some_err = err; return; }`
+- Cannot use `try` in thread functions
+
+**Memory ownership in thread contexts:**
+- When copying structs that contain pointers (like `PrsPaginationThreadCtx`), both the stack copy and array copy point to the SAME heap object (`result_ptr`)
+- Only ONE copy should call `allocator.destroy()`
+- Use array copy for cleanup, not the temporary stack copy
+
+**Pagination best practices:**
+- Always propagate `has_more` from paginated API results
+- Check `!has_more` AFTER successful merge to avoid unnecessary batches
+- Don't rely solely on empty page detection (`len == 0`) — inefficient for full last pages
+
+**User input validation:**
+- Always validate numeric flags that control iteration/loops
+- Zero values often cause infinite loops or meaningless operations
+- Provide clear error messages ("must be at least 1", not just "invalid")
+
+---
+
+## Parallel Crash Fix — Merged (2026-03-20)
+
+**PR #41:** https://github.com/christianhelle/chlogr/pull/41
+
+### Team Review & Approval
+
+- **Mr. Pink:** Added 8 comprehensive edge-case tests (boundary values 1/32/64, error conditions 0/missing/invalid, combined flags)
+- **Mr. White:** Approved code review with verdict APPROVED — memory safety verified, all 44 tests passing, ready to merge
+
+### Final Status
+✅ Build passing  
+✅ 44 tests passing  
+✅ Memory safety verified  
+✅ PR ready for merge

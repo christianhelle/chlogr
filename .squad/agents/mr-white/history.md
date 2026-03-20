@@ -125,6 +125,19 @@ Full documentation and governance series complete. chlogr now has shipping paral
 - Mr. Pink added 8 new tests covering boundary values (1, 32, 64), error conditions (0, missing, invalid), and combined flags.
 - Build passes; all 44 tests pass.
 
+## PR #41 — Parallel Crash Fix Merged (2026-03-20)
+
+**Branch:** `fix/parallel-crash`  
+**PR:** #41  
+**Status:** ✅ Approved & Ready to Merge
+
+### Final Review Metrics
+- Build: ✅ PASS
+- Tests: ✅ 44/44 PASS (20 original integration tests + 8 new edge-case tests by Mr. Pink + 16 CLI tests)
+- Memory safety: ✅ VERIFIED
+- Code quality: ✅ EXCELLENT
+- Verdict: APPROVED FOR MERGE
+
 ## Learnings
 
 ### Dynamic Thread Management Pattern

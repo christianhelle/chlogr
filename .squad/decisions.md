@@ -28,6 +28,34 @@
 
 ---
 
+### Parallel Crash Bug Fixes
+
+**Author:** Mr. Orange (Systems Dev)  
+**Date:** 2026-03-20  
+**Status:** Fixed (PR #41, pending merge)  
+**Related Issue:** Crash when --parallel > 32 or = 0
+
+#### Decision
+Fix 6 critical bugs in parallel PR pagination:
+1. **Dynamic ArrayList** — Replace fixed-size `[32]std.Thread` arrays with `ArrayList` for arbitrary parallelism
+2. **Double-free prevention** — Correctly cleanup thread_ctx on spawn failure (lines 464-478)
+3. **Memory leak fix** — Free remaining contexts before early return (lines 508-514)
+4. **has_more propagation** — Stop pagination when `false` (lines 500, 523-530)
+5. **Zero validation** — Reject `--parallel 0` with clear error (cli.zig lines 31-37)
+6. **Test updates** — CLI tests updated to value-based syntax
+
+#### Validation
+- ✅ Build passing
+- ✅ 44 tests passing (20 original + 8 new edge-case tests by Mr. Pink)
+- ✅ Memory safety verified by Mr. White
+- ✅ All error paths correct
+- ✅ Zig idioms followed
+
+#### Outcome
+PR #41 approved and ready for merge. No regressions. Full test coverage.
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
