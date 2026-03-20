@@ -9,6 +9,8 @@ on:
       - ".github/workflows/changelog.yml"
       - "snapcraft.yaml"
       - "**/*.zig"
+  release:
+    types: [published]
 
 jobs:
   changelog:
