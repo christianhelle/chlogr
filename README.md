@@ -11,7 +11,7 @@ A fast, efficient, native CLI tool to automatically generate changelogs from Git
 - Smart token resolution (--token flag → env vars → `gh auth token` CLI)
 - Works with any GitHub repository
 - Progress output during fetch — per-section headers and page counters keep you informed on large repos
-- Optional parallel fetching (`--parallel`) — fetches releases and PRs concurrently for faster results
+- Optional parallel fetching (`--parallel <N>`) — fetches releases and PRs concurrently with bounded page concurrency
 - Fully functional core logic verified with integration tests
 
 ## Building
@@ -39,10 +39,10 @@ chlogr --repo [org]/[repo] --token ghp_xxxxxxxxxxxx
 ### With Parallel Fetching
 
 ```bash
-chlogr --repo [org]/[repo] --parallel
+chlogr --repo [org]/[repo] --parallel 4
 ```
 
-Use `--parallel` on large repositories with many releases and pull requests to cut fetch time roughly in half.
+Use `--parallel <N>` on large repositories with many releases and pull requests to allow up to `N` concurrent page requests per fetch stream.
 
 ### Options
 
@@ -52,7 +52,7 @@ Use `--parallel` on large repositories with many releases and pull requests to c
 - `--since-tag` (optional): Start from this tag/version
 - `--until-tag` (optional): End at this tag/version
 - `--exclude-labels` (optional): Comma-separated labels to exclude (e.g., duplicate,wontfix)
-- `--parallel` (optional): Fetch releases and pull requests concurrently (faster for large repos)
+- `--parallel <N>` (optional): Fetch releases and pull requests concurrently with up to `N` page requests per stream
 
 ### Authentication
 
