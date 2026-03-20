@@ -114,3 +114,28 @@ chlogr now supports `--parallel` for concurrent GitHub API data fetching. Sequen
 - Establishes team standard for documentation accuracy
 
 Full documentation and governance series complete. chlogr now has shipping parallel fetch feature + documented maintenance process.
+
+## PR #41 Review — Parallel Crash Fix (`fix/parallel-crash`)
+
+**Review verdict:** Approved and PR opened.  
+**Key observations:**
+- Fixed 6 bugs total: fixed-size array overflow (dop > 32), double-free on spawn failure, memory leak on empty page, missing has_more propagation, no validation for dop=0, outdated CLI tests.
+- Core fix: replaced `[32]std.Thread` and `[32]PrsPaginationThreadCtx` with `std.ArrayList` for arbitrary degree of parallelism.
+- Memory safety verified: all allocations have matching frees, errdefer scopes correctly placed, no use-after-free risks.
+- Mr. Pink added 8 new tests covering boundary values (1, 32, 64), error conditions (0, missing, invalid), and combined flags.
+- Build passes; all 44 tests pass.
+
+## Learnings
+
+### Dynamic Thread Management Pattern
+When spawning a variable number of threads, always use `std.ArrayList(std.Thread)` instead of fixed-size stack arrays. Fixed arrays cause undefined behavior when the user-provided count exceeds the array size. The pattern:
+```zig
+var threads = std.ArrayList(std.Thread).initCapacity(allocator, 0) catch ...;
+defer threads.deinit(allocator);
+```
+
+### Thread Spawn Error Cleanup
+When `std.Thread.spawn` fails mid-batch, carefully join only the successfully spawned threads (indices 0..idx-1) and deinit only the contexts that were created. The context at index `idx` was appended but its thread never started, so it must be deinited separately — this prevents double-free if the loop accidentally processes it.
+
+### CLI Validation for Parallelism
+Always validate user-provided parallelism values >= 1. Zero causes infinite loops in batch processing patterns where `while (idx < dop)` never executes but the outer loop continues forever.
