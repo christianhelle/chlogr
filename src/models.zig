@@ -16,6 +16,10 @@ pub const PullRequest = struct {
     merged_at: ?[]const u8,
 };
 
+pub const IssuePullRequestRef = struct {
+    url: ?[]const u8 = null,
+};
+
 pub const Issue = struct {
     number: u32,
     title: []const u8,
@@ -23,6 +27,8 @@ pub const Issue = struct {
     html_url: []const u8,
     user: User,
     labels: []Label,
+    closed_at: ?[]const u8 = null,
+    pull_request: ?IssuePullRequestRef = null,
 };
 
 pub const Label = struct {
