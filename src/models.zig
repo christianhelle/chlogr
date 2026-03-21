@@ -23,6 +23,7 @@ pub const Issue = struct {
     html_url: []const u8,
     user: User,
     labels: []Label,
+    closed_at: ?[]const u8,
 };
 
 pub const Label = struct {

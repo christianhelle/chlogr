@@ -21,7 +21,6 @@ pub fn main() !void {
             try cli_parser.printHelp();
             return;
         }
-        std.debug.print("Error: {}\n", .{err});
         try cli_parser.printHelp();
         return err;
     };
@@ -58,6 +57,7 @@ pub fn main() !void {
     const FetchedData = struct {
         releases: []models.Release,
         prs: []models.PullRequest,
+        issues: []models.Issue,
     };
 
     const fetched: FetchedData = if (parsed_args.parallel) blk: {
@@ -79,7 +79,7 @@ pub fn main() !void {
             }
             return err;
         };
-        break :blk .{ .releases = fetch_results.releases, .prs = fetch_results.prs };
+        break :blk .{ .releases = fetch_results.releases, .prs = fetch_results.prs, .issues = fetch_results.issues };
     } else blk: {
         std.debug.print("\nFetching releases...\n", .{});
         const releases = api_client.getReleases() catch |err| {
@@ -98,14 +98,20 @@ pub fn main() !void {
             std.debug.print("Error fetching pull requests: {}\n", .{err});
             return err;
         };
-        break :blk .{ .releases = releases, .prs = prs };
+        std.debug.print("Fetching issues...\n", .{});
+        const issues = api_client.getClosedIssues() catch |err| {
+            std.debug.print("Error fetching issues: {}\n", .{err});
+            return err;
+        };
+        break :blk .{ .releases = releases, .prs = prs, .issues = issues };
     };
     defer api_client.freeReleases(fetched.releases);
     defer api_client.freePullRequests(fetched.prs);
+    defer api_client.freeIssues(fetched.issues);
 
     std.debug.print(
-        "Found {d} releases and {d} pull requests\n",
-        .{ fetched.releases.len, fetched.prs.len },
+        "Found {d} releases, {d} pull requests, and {d} issues\n",
+        .{ fetched.releases.len, fetched.prs.len, fetched.issues.len },
     );
 
     // Generate changelog
@@ -115,7 +121,7 @@ pub fn main() !void {
     );
     gen.since_tag = parsed_args.since_tag;
     gen.until_tag = parsed_args.until_tag;
-    const changelog = gen.generate(fetched.releases, fetched.prs) catch |err| {
+    const changelog = gen.generate(fetched.releases, fetched.prs, fetched.issues) catch |err| {
         if (err == error.SinceTagNotFound) {
             std.debug.print(
                 "Error: --since-tag '{s}' was not found in the fetched releases\n",

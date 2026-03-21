@@ -83,6 +83,7 @@ fn copyIssue(allocator: std.mem.Allocator, src: models.Issue) !models.Issue {
         .html_url = html_url,
         .user = .{ .login = user_login, .html_url = user_html_url },
         .labels = labels,
+        .closed_at = src.closed_at,
     };
 }
 
@@ -814,11 +815,11 @@ pub const GitHubApiClient = struct {
     }
 
     /// Fetch closed issues
-    pub fn getClosedIssues(self: *GitHubApiClient, per_page: u32) ![]models.Issue {
+    pub fn getClosedIssues(self: *GitHubApiClient) ![]models.Issue {
         const endpoint = try std.fmt.allocPrint(
             self.allocator,
             "/repos/{s}/issues?state=closed&per_page={d}",
-            .{ self.repo, per_page },
+            .{ self.repo, 100 },
         );
         defer self.allocator.free(endpoint);
 
@@ -878,22 +879,17 @@ pub const GitHubApiClient = struct {
 pub const ParallelFetchResults = struct {
     releases: []models.Release = &.{},
     prs: []models.PullRequest = &.{},
+    issues: []models.Issue = &.{},
     releases_fetched: bool = false,
     prs_fetched: bool = false,
+    issues_fetched: bool = false,
     releases_err: ?anyerror = null,
     prs_err: ?anyerror = null,
+    issues_err: ?anyerror = null,
 };
 
 /// Context passed to each thread
-const ReleasesThreadCtx = struct {
-    allocator: std.mem.Allocator,
-    token: []const u8,
-    repo: []const u8,
-    degree_of_parallelism: u32,
-    results: *ParallelFetchResults,
-};
-
-const PrsThreadCtx = struct {
+const ThreadCtx = struct {
     allocator: std.mem.Allocator,
     token: []const u8,
     repo: []const u8,
@@ -917,7 +913,7 @@ const PullRequestsPaginationWorkerCtx = struct {
     page_slots: []?[]models.PullRequest,
 };
 
-fn releasesThreadFn(ctx: ReleasesThreadCtx) void {
+fn releasesThreadFn(ctx: ThreadCtx) void {
     var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
     defer client.deinit();
     ctx.results.releases = client.getAllReleases(ctx.degree_of_parallelism) catch |err| {
@@ -927,7 +923,7 @@ fn releasesThreadFn(ctx: ReleasesThreadCtx) void {
     ctx.results.releases_fetched = true;
 }
 
-fn prsThreadFn(ctx: PrsThreadCtx) void {
+fn prsThreadFn(ctx: ThreadCtx) void {
     var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
     defer client.deinit();
     ctx.results.prs = client.getAllPullRequests(ctx.degree_of_parallelism) catch |err| {
@@ -935,6 +931,16 @@ fn prsThreadFn(ctx: PrsThreadCtx) void {
         return;
     };
     ctx.results.prs_fetched = true;
+}
+
+fn issuesThreadFn(ctx: ThreadCtx) void {
+    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    defer client.deinit();
+    ctx.results.issues = client.getClosedIssues() catch |err| {
+        ctx.results.issues_err = err;
+        return;
+    };
+    ctx.results.issues_fetched = true;
 }
 
 fn releasesPaginationWorkerFn(ctx: ReleasesPaginationWorkerCtx) void {
@@ -993,15 +999,21 @@ pub const ParallelFetcher = struct {
     /// On error, any successfully fetched data is freed before returning.
     pub fn fetch(self: *ParallelFetcher) !ParallelFetchResults {
         var results = ParallelFetchResults{};
-
-        const releases_ctx = ReleasesThreadCtx{
+        const releases_ctx = ThreadCtx{
             .allocator = self.allocator,
             .token = self.token,
             .repo = self.repo,
             .degree_of_parallelism = self.degree_of_parallelism,
             .results = &results,
         };
-        const prs_ctx = PrsThreadCtx{
+        const prs_ctx = ThreadCtx{
+            .allocator = self.allocator,
+            .token = self.token,
+            .repo = self.repo,
+            .degree_of_parallelism = self.degree_of_parallelism,
+            .results = &results,
+        };
+        const issues_ctx = ThreadCtx{
             .allocator = self.allocator,
             .token = self.token,
             .repo = self.repo,
@@ -1011,11 +1023,12 @@ pub const ParallelFetcher = struct {
 
         const releases_thread = try std.Thread.spawn(.{}, releasesThreadFn, .{releases_ctx});
         const prs_thread = try std.Thread.spawn(.{}, prsThreadFn, .{prs_ctx});
+        const issues_thread = try std.Thread.spawn(.{}, issuesThreadFn, .{issues_ctx});
 
         releases_thread.join();
         prs_thread.join();
+        issues_thread.join();
 
-        // Check for errors — free any successfully fetched data before returning error
         if (results.releases_err) |err| {
             if (results.prs_fetched) {
                 freePullRequestSlice(self.allocator, results.prs);
@@ -1025,6 +1038,12 @@ pub const ParallelFetcher = struct {
         if (results.prs_err) |err| {
             if (results.releases_fetched) {
                 freeReleaseSlice(self.allocator, results.releases);
+            }
+            return err;
+        }
+        if (results.issues_err) |err| {
+            if (results.issues_fetched) {
+                freeIssueSlice(self.allocator, results.issues);
             }
             return err;
         }

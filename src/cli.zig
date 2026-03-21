@@ -108,6 +108,7 @@ pub const CliParser = struct {
             \\  chlogr --repo github/cli
             \\  chlogr --repo github/cli --token ghp_xxxx --output HISTORY.md
             \\
+            \\
         ;
         const help_text = try std.fmt.allocPrint(self.allocator, text, .{VERSION});
         defer self.allocator.free(help_text);

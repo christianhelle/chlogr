@@ -136,6 +136,7 @@ pub const ChangelogGenerator = struct {
         self: ChangelogGenerator,
         releases: []models.Release,
         prs: []models.PullRequest,
+        issues: []models.Issue,
     ) !Changelog {
         // Apply tag-range filter before assignment so --since-tag/--until-tag
         // restrict which releases are considered.
@@ -188,6 +189,27 @@ pub const ChangelogGenerator = struct {
                     .url = pr.html_url,
                     .author = pr.user.login,
                     .number = pr.number,
+                };
+
+                try gop.value_ptr.append(self.allocator, entry);
+            }
+
+            for (issues) |issue| {
+                const closed_at = issue.closed_at orelse continue;
+                if (std.mem.order(u8, closed_at, release.published_at) == .gt) continue;
+
+                const category = self.categorizeEntry(issue.labels);
+
+                var gop = try sections_map.getOrPut(category);
+                if (!gop.found_existing) {
+                    gop.value_ptr.* = .empty;
+                }
+
+                const entry = ChangelogEntry{
+                    .title = issue.title,
+                    .url = issue.html_url,
+                    .author = issue.user.login,
+                    .number = issue.number,
                 };
 
                 try gop.value_ptr.append(self.allocator, entry);
@@ -246,6 +268,27 @@ pub const ChangelogGenerator = struct {
                 .url = pr.html_url,
                 .author = pr.user.login,
                 .number = pr.number,
+            };
+
+            try gop.value_ptr.append(self.allocator, entry);
+        }
+
+        for (issues) |issue| {
+            if (issue.closed_at == null) continue;
+
+            has_unreleased = true;
+            const category = self.categorizeEntry(issue.labels);
+
+            var gop = try unreleased_sections_map.getOrPut(category);
+            if (!gop.found_existing) {
+                gop.value_ptr.* = .empty;
+            }
+
+            const entry = ChangelogEntry{
+                .title = issue.title,
+                .url = issue.html_url,
+                .author = issue.user.login,
+                .number = issue.number,
             };
 
             try gop.value_ptr.append(self.allocator, entry);
