@@ -64,6 +64,14 @@ fn copyPullRequest(allocator: std.mem.Allocator, src: models.PullRequest) !model
     };
 }
 
+fn copyIssuePullRequestRef(
+    allocator: std.mem.Allocator,
+    src: models.IssuePullRequestRef,
+) !models.IssuePullRequestRef {
+    const url: ?[]const u8 = if (src.url) |value| try allocator.dupe(u8, value) else null;
+    return .{ .url = url };
+}
+
 fn copyIssue(allocator: std.mem.Allocator, src: models.Issue) !models.Issue {
     const title = try allocator.dupe(u8, src.title);
     errdefer allocator.free(title);
@@ -76,6 +84,20 @@ fn copyIssue(allocator: std.mem.Allocator, src: models.Issue) !models.Issue {
     const user_html_url = try allocator.dupe(u8, src.user.html_url);
     errdefer allocator.free(user_html_url);
     const labels = try copyLabels(allocator, src.labels);
+    errdefer {
+        for (labels) |l| {
+            allocator.free(l.name);
+            allocator.free(l.color);
+        }
+        allocator.free(labels);
+    }
+    const closed_at: ?[]const u8 = if (src.closed_at) |value| try allocator.dupe(u8, value) else null;
+    errdefer if (closed_at) |value| allocator.free(value);
+    const pull_request: ?models.IssuePullRequestRef = if (src.pull_request) |value|
+        try copyIssuePullRequestRef(allocator, value)
+    else
+        null;
+    errdefer if (pull_request) |value| if (value.url) |url| allocator.free(url);
     return .{
         .number = src.number,
         .title = title,
@@ -83,6 +105,8 @@ fn copyIssue(allocator: std.mem.Allocator, src: models.Issue) !models.Issue {
         .html_url = html_url,
         .user = .{ .login = user_login, .html_url = user_html_url },
         .labels = labels,
+        .closed_at = closed_at,
+        .pull_request = pull_request,
     };
 }
 
@@ -120,6 +144,10 @@ fn freeIssue(allocator: std.mem.Allocator, issue: models.Issue) void {
         allocator.free(label.color);
     }
     allocator.free(issue.labels);
+    if (issue.closed_at) |closed_at| allocator.free(closed_at);
+    if (issue.pull_request) |pull_request| {
+        if (pull_request.url) |url| allocator.free(url);
+    }
 }
 
 fn freeReleaseSlice(allocator: std.mem.Allocator, releases: []models.Release) void {
@@ -379,6 +407,23 @@ fn mergeOrderedPages(
     return merged;
 }
 
+fn copyClosedIssues(allocator: std.mem.Allocator, src: []const models.Issue) ![]models.Issue {
+    var issues = try std.ArrayList(models.Issue).initCapacity(allocator, src.len);
+    errdefer {
+        for (issues.items) |issue| {
+            freeIssue(allocator, issue);
+        }
+        issues.deinit(allocator);
+    }
+
+    for (src) |issue| {
+        if (issue.pull_request != null) continue;
+        issues.appendAssumeCapacity(try copyIssue(allocator, issue));
+    }
+
+    return try issues.toOwnedSlice(allocator);
+}
+
 fn PageResult(comptime T: type) type {
     return struct {
         items: []T,
@@ -407,6 +452,11 @@ pub const GitHubApiClient = struct {
     /// Fetch merged pull requests (paginated)
     pub fn getMergedPullRequests(self: *GitHubApiClient) ![]models.PullRequest {
         return self.getAllPullRequests(1);
+    }
+
+    /// Fetch closed issues (paginated)
+    pub fn getClosedIssues(self: *GitHubApiClient) ![]models.Issue {
+        return self.getAllClosedIssues(1);
     }
 
     fn getAllReleases(self: *GitHubApiClient, degree_of_parallelism: u32) ![]models.Release {
@@ -455,6 +505,29 @@ pub const GitHubApiClient = struct {
         };
     }
 
+    fn getAllClosedIssues(self: *GitHubApiClient, degree_of_parallelism: u32) ![]models.Issue {
+        const first_page = try self.fetchIssuePage(1);
+        const plan = buildPaginationPlan(
+            first_page.pagination,
+            first_page.items.len,
+            degree_of_parallelism,
+        );
+
+        return switch (plan.strategy) {
+            .single_page => first_page.items,
+            .sequential_fallback => self.fetchRemainingIssuesSequential(
+                first_page.items,
+                plan.total_pages,
+                2,
+            ),
+            .bounded_parallel => self.fetchRemainingIssuesParallel(
+                first_page.items,
+                plan.total_pages.?,
+                plan.worker_count,
+            ),
+        };
+    }
+
     fn buildReleasesEndpoint(self: *GitHubApiClient, page: u32) ![]u8 {
         return std.fmt.allocPrint(
             self.allocator,
@@ -467,6 +540,14 @@ pub const GitHubApiClient = struct {
         return std.fmt.allocPrint(
             self.allocator,
             "/repos/{s}/pulls?state=closed&page={d}&per_page={d}&sort=updated&direction=desc",
+            .{ self.repo, page, github_page_size },
+        );
+    }
+
+    fn buildIssuesEndpoint(self: *GitHubApiClient, page: u32) ![]u8 {
+        return std.fmt.allocPrint(
+            self.allocator,
+            "/repos/{s}/issues?state=closed&page={d}&per_page={d}&sort=updated&direction=desc",
             .{ self.repo, page, github_page_size },
         );
     }
@@ -553,6 +634,32 @@ pub const GitHubApiClient = struct {
         };
     }
 
+    fn fetchIssuePage(self: *GitHubApiClient, page: u32) !PageResult(models.Issue) {
+        std.debug.print("  Fetching closed issues page {d}...\n", .{page});
+        const endpoint = try self.buildIssuesEndpoint(page);
+        defer self.allocator.free(endpoint);
+
+        const response = try self.http_client.get(endpoint);
+        defer response.deinit(self.allocator);
+
+        if (response.status != .ok) {
+            return error.GitHubApiError;
+        }
+
+        var parsed = try std.json.parseFromSlice(
+            []models.Issue,
+            self.allocator,
+            response.body,
+            .{ .ignore_unknown_fields = true },
+        );
+        defer parsed.deinit();
+
+        return .{
+            .items = try copyClosedIssues(self.allocator, parsed.value),
+            .pagination = parsePaginationInfo(response.link_header),
+        };
+    }
+
     fn appendMovedReleasePage(
         self: *GitHubApiClient,
         releases: *std.ArrayList(models.Release),
@@ -572,6 +679,17 @@ pub const GitHubApiClient = struct {
         errdefer freePullRequestSlice(self.allocator, page_items);
 
         try prs.appendSlice(self.allocator, page_items);
+        self.allocator.free(page_items);
+    }
+
+    fn appendMovedIssuePage(
+        self: *GitHubApiClient,
+        issues: *std.ArrayList(models.Issue),
+        page_items: []models.Issue,
+    ) !void {
+        errdefer freeIssueSlice(self.allocator, page_items);
+
+        try issues.appendSlice(self.allocator, page_items);
         self.allocator.free(page_items);
     }
 
@@ -669,6 +787,54 @@ pub const GitHubApiClient = struct {
         }
 
         return try prs.toOwnedSlice(self.allocator);
+    }
+
+    fn fetchRemainingIssuesSequential(
+        self: *GitHubApiClient,
+        first_page_items: []models.Issue,
+        initial_last_page: ?u32,
+        start_page: u32,
+    ) ![]models.Issue {
+        var issues = try std.ArrayList(models.Issue).initCapacity(
+            self.allocator,
+            first_page_items.len,
+        );
+        errdefer {
+            for (issues.items) |issue| {
+                freeIssue(self.allocator, issue);
+            }
+            issues.deinit(self.allocator);
+        }
+
+        try self.appendMovedIssuePage(&issues, first_page_items);
+
+        var last_page = initial_last_page;
+        var page = start_page;
+        while (true) : (page += 1) {
+            if (last_page) |known_last| {
+                if (page > known_last) break;
+            }
+
+            const page_result = try self.fetchIssuePage(page);
+            const page_len = page_result.items.len;
+            const pagination = page_result.pagination;
+
+            if (pagination.last_page) |discovered_last_page| {
+                last_page = discovered_last_page;
+            }
+
+            try self.appendMovedIssuePage(&issues, page_result.items);
+
+            if (last_page) |known_last| {
+                if (page >= known_last) break;
+            } else if (pagination.header_present) {
+                if (!pagination.has_next) break;
+            } else if (page_len < github_page_size_usize) {
+                break;
+            }
+        }
+
+        return try issues.toOwnedSlice(self.allocator);
     }
 
     fn fetchRemainingReleasesParallel(
@@ -813,45 +979,75 @@ pub const GitHubApiClient = struct {
         return merged;
     }
 
-    /// Fetch closed issues
-    pub fn getClosedIssues(self: *GitHubApiClient, per_page: u32) ![]models.Issue {
-        const endpoint = try std.fmt.allocPrint(
-            self.allocator,
-            "/repos/{s}/issues?state=closed&per_page={d}",
-            .{ self.repo, per_page },
-        );
-        defer self.allocator.free(endpoint);
+    fn fetchRemainingIssuesParallel(
+        self: *GitHubApiClient,
+        first_page_items: []models.Issue,
+        total_pages: u32,
+        worker_count: u32,
+    ) ![]models.Issue {
+        const remaining_pages: usize = @intCast(total_pages - 1);
+        const page_slots = try self.allocator.alloc(?[]models.Issue, remaining_pages);
+        defer self.allocator.free(page_slots);
+        @memset(page_slots, null);
 
-        const response = try self.http_client.get(endpoint);
-        defer response.deinit(self.allocator);
-
-        if (response.status != .ok) {
-            return error.GitHubApiError;
-        }
-
-        var parsed = try std.json.parseFromSlice(
-            []models.Issue,
-            self.allocator,
-            response.body,
-            .{ .ignore_unknown_fields = true },
-        );
-        defer parsed.deinit();
-
-        var issues = try std.ArrayList(models.Issue).initCapacity(
-            self.allocator,
-            parsed.value.len,
-        );
+        errdefer freeIssueSlice(self.allocator, first_page_items);
         errdefer {
-            for (issues.items) |issue| {
-                freeIssue(self.allocator, issue);
+            for (page_slots) |page_items| {
+                if (page_items) |items| {
+                    freeIssueSlice(self.allocator, items);
+                }
             }
-            issues.deinit(self.allocator);
         }
 
-        for (parsed.value) |issue| {
-            issues.appendAssumeCapacity(try copyIssue(self.allocator, issue));
+        var state = WorkerPageState{ .total_pages = total_pages };
+        var threads = try std.ArrayList(std.Thread).initCapacity(
+            self.allocator,
+            @intCast(worker_count),
+        );
+        defer threads.deinit(self.allocator);
+
+        const worker_count_usize: usize = @intCast(worker_count);
+        var worker_index: usize = 0;
+        while (worker_index < worker_count_usize) : (worker_index += 1) {
+            const ctx = IssuesPaginationWorkerCtx{
+                .allocator = self.allocator,
+                .token = self.http_client.token,
+                .repo = self.repo,
+                .state = &state,
+                .page_slots = page_slots,
+            };
+            const thread = std.Thread.spawn(.{}, issuesPaginationWorkerFn, .{ctx}) catch |err| {
+                for (threads.items) |started_thread| {
+                    started_thread.join();
+                }
+                return err;
+            };
+            threads.appendAssumeCapacity(thread);
         }
-        return try issues.toOwnedSlice(self.allocator);
+
+        for (threads.items) |thread| {
+            thread.join();
+        }
+
+        if (state.err) |err| {
+            return err;
+        }
+
+        for (page_slots) |page_items| {
+            if (page_items == null) return error.IncompletePagination;
+        }
+
+        const merged = try mergeOrderedPages(
+            models.Issue,
+            self.allocator,
+            first_page_items,
+            page_slots,
+        );
+        self.allocator.free(first_page_items);
+        for (page_slots) |page_items| {
+            self.allocator.free(page_items.?);
+        }
+        return merged;
     }
 
     pub fn deinit(self: *GitHubApiClient) void {
@@ -878,10 +1074,13 @@ pub const GitHubApiClient = struct {
 pub const ParallelFetchResults = struct {
     releases: []models.Release = &.{},
     prs: []models.PullRequest = &.{},
+    issues: []models.Issue = &.{},
     releases_fetched: bool = false,
     prs_fetched: bool = false,
+    issues_fetched: bool = false,
     releases_err: ?anyerror = null,
     prs_err: ?anyerror = null,
+    issues_err: ?anyerror = null,
 };
 
 /// Context passed to each thread
@@ -894,6 +1093,14 @@ const ReleasesThreadCtx = struct {
 };
 
 const PrsThreadCtx = struct {
+    allocator: std.mem.Allocator,
+    token: []const u8,
+    repo: []const u8,
+    degree_of_parallelism: u32,
+    results: *ParallelFetchResults,
+};
+
+const IssuesThreadCtx = struct {
     allocator: std.mem.Allocator,
     token: []const u8,
     repo: []const u8,
@@ -917,6 +1124,14 @@ const PullRequestsPaginationWorkerCtx = struct {
     page_slots: []?[]models.PullRequest,
 };
 
+const IssuesPaginationWorkerCtx = struct {
+    allocator: std.mem.Allocator,
+    token: []const u8,
+    repo: []const u8,
+    state: *WorkerPageState,
+    page_slots: []?[]models.Issue,
+};
+
 fn releasesThreadFn(ctx: ReleasesThreadCtx) void {
     var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
     defer client.deinit();
@@ -935,6 +1150,16 @@ fn prsThreadFn(ctx: PrsThreadCtx) void {
         return;
     };
     ctx.results.prs_fetched = true;
+}
+
+fn issuesThreadFn(ctx: IssuesThreadCtx) void {
+    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    defer client.deinit();
+    ctx.results.issues = client.getAllClosedIssues(ctx.degree_of_parallelism) catch |err| {
+        ctx.results.issues_err = err;
+        return;
+    };
+    ctx.results.issues_fetched = true;
 }
 
 fn releasesPaginationWorkerFn(ctx: ReleasesPaginationWorkerCtx) void {
@@ -969,6 +1194,22 @@ fn pullRequestsPaginationWorkerFn(ctx: PullRequestsPaginationWorkerCtx) void {
     }
 }
 
+fn issuesPaginationWorkerFn(ctx: IssuesPaginationWorkerCtx) void {
+    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    defer client.deinit();
+
+    while (true) {
+        const page = ctx.state.claimNextPage() orelse return;
+        const page_result = client.fetchIssuePage(page) catch |err| {
+            ctx.state.setError(err);
+            return;
+        };
+
+        const slot_index: usize = @intCast(page - 2);
+        ctx.page_slots[slot_index] = page_result.items;
+    }
+}
+
 pub const ParallelFetcher = struct {
     allocator: std.mem.Allocator,
     token: []const u8,
@@ -989,7 +1230,7 @@ pub const ParallelFetcher = struct {
         };
     }
 
-    /// Fetch releases and PRs concurrently. Caller owns the returned slices.
+    /// Fetch releases, pull requests, and issues concurrently. Caller owns the returned slices.
     /// On error, any successfully fetched data is freed before returning.
     pub fn fetch(self: *ParallelFetcher) !ParallelFetchResults {
         var results = ParallelFetchResults{};
@@ -1008,23 +1249,63 @@ pub const ParallelFetcher = struct {
             .degree_of_parallelism = self.degree_of_parallelism,
             .results = &results,
         };
+        const issues_ctx = IssuesThreadCtx{
+            .allocator = self.allocator,
+            .token = self.token,
+            .repo = self.repo,
+            .degree_of_parallelism = self.degree_of_parallelism,
+            .results = &results,
+        };
 
         const releases_thread = try std.Thread.spawn(.{}, releasesThreadFn, .{releases_ctx});
-        const prs_thread = try std.Thread.spawn(.{}, prsThreadFn, .{prs_ctx});
+        const prs_thread = std.Thread.spawn(.{}, prsThreadFn, .{prs_ctx}) catch |err| {
+            releases_thread.join();
+            if (results.releases_fetched) {
+                freeReleaseSlice(self.allocator, results.releases);
+            }
+            return err;
+        };
+        const issues_thread = std.Thread.spawn(.{}, issuesThreadFn, .{issues_ctx}) catch |err| {
+            prs_thread.join();
+            releases_thread.join();
+            if (results.prs_fetched) {
+                freePullRequestSlice(self.allocator, results.prs);
+            }
+            if (results.releases_fetched) {
+                freeReleaseSlice(self.allocator, results.releases);
+            }
+            return err;
+        };
 
         releases_thread.join();
         prs_thread.join();
+        issues_thread.join();
 
         // Check for errors — free any successfully fetched data before returning error
         if (results.releases_err) |err| {
             if (results.prs_fetched) {
                 freePullRequestSlice(self.allocator, results.prs);
             }
+            if (results.issues_fetched) {
+                freeIssueSlice(self.allocator, results.issues);
+            }
             return err;
         }
         if (results.prs_err) |err| {
             if (results.releases_fetched) {
                 freeReleaseSlice(self.allocator, results.releases);
+            }
+            if (results.issues_fetched) {
+                freeIssueSlice(self.allocator, results.issues);
+            }
+            return err;
+        }
+        if (results.issues_err) |err| {
+            if (results.releases_fetched) {
+                freeReleaseSlice(self.allocator, results.releases);
+            }
+            if (results.prs_fetched) {
+                freePullRequestSlice(self.allocator, results.prs);
             }
             return err;
         }
@@ -1037,10 +1318,13 @@ test "ParallelFetchResults default fields" {
     const r = ParallelFetchResults{};
     try std.testing.expect(r.releases.len == 0);
     try std.testing.expect(r.prs.len == 0);
+    try std.testing.expect(r.issues.len == 0);
     try std.testing.expect(!r.releases_fetched);
     try std.testing.expect(!r.prs_fetched);
+    try std.testing.expect(!r.issues_fetched);
     try std.testing.expect(r.releases_err == null);
     try std.testing.expect(r.prs_err == null);
+    try std.testing.expect(r.issues_err == null);
 }
 
 test "parseLastPageFromLinkHeader extracts last PR page" {
@@ -1107,6 +1391,26 @@ test "buildPaginationPlan falls back when a full page has no link metadata" {
     try std.testing.expectEqual(PaginationStrategy.sequential_fallback, plan.strategy);
     try std.testing.expectEqual(@as(?u32, null), plan.total_pages);
     try std.testing.expectEqual(@as(u32, 0), plan.worker_count);
+}
+
+test "copyClosedIssues skips pull request entries" {
+    const td = @import("test_data.zig");
+
+    var parsed = try std.json.parseFromSlice(
+        []models.Issue,
+        std.testing.allocator,
+        td.test_closed_issues_with_pull_request_marker,
+        .{},
+    );
+    defer parsed.deinit();
+
+    const issues = try copyClosedIssues(std.testing.allocator, parsed.value);
+    defer freeIssueSlice(std.testing.allocator, issues);
+
+    try std.testing.expectEqual(@as(usize, 2), issues.len);
+    try std.testing.expectEqual(@as(u32, 910), issues[0].number);
+    try std.testing.expectEqual(@as(u32, 912), issues[1].number);
+    try std.testing.expectEqualStrings("2024-01-13T09:00:00Z", issues[0].closed_at.?);
 }
 
 test "mergeOrderedPages preserves PR ordering across page slots" {
@@ -1222,6 +1526,9 @@ test "copyPullRequest cleans up on allocation failure" {
 
 test "copyIssue cleans up on allocation failure" {
     var label = models.Label{ .name = "bug", .color = "d73a4a" };
+    const pull_request = models.IssuePullRequestRef{
+        .url = "https://api.github.com/repos/owner/repo/pulls/1",
+    };
     const src = models.Issue{
         .number = 1,
         .title = "Bug report",
@@ -1229,10 +1536,12 @@ test "copyIssue cleans up on allocation failure" {
         .html_url = "https://github.com/owner/repo/issues/1",
         .user = .{ .login = "reporter", .html_url = "https://github.com/reporter" },
         .labels = @as([*]models.Label, @ptrCast(&label))[0..1],
+        .closed_at = "2024-01-01T12:00:00Z",
+        .pull_request = pull_request,
     };
-    // 8 allocations: title, body, html_url, user.login, user.html_url,
-    //   labels backing, label.name, label.color
-    for (0..8) |i| {
+    // 10 allocations: title, body, html_url, user.login, user.html_url,
+    //   labels backing, label.name, label.color, closed_at, pull_request.url
+    for (0..10) |i| {
         var fa = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = i });
         try std.testing.expectError(error.OutOfMemory, copyIssue(fa.allocator(), src));
     }
