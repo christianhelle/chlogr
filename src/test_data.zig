@@ -166,6 +166,135 @@ pub const test_pull_requests_all_unreleased =
     \\]
 ;
 
+pub const test_closed_issues =
+    \\[
+    \\  {
+    \\    "number": 910,
+    \\    "title": "Close onboarding issue",
+    \\    "body": "Closed before v1.2.0",
+    \\    "html_url": "https://github.com/owner/repo/issues/910",
+    \\    "user": {
+    \\      "login": "frank",
+    \\      "html_url": "https://github.com/frank"
+    \\    },
+    \\    "labels": [
+    \\      {
+    \\        "name": "bug",
+    \\        "color": "d73a4a"
+    \\      }
+    \\    ],
+    \\    "closed_at": "2024-01-14T09:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 911,
+    \\    "title": "Close docs issue",
+    \\    "body": "Closed before v1.1.0",
+    \\    "html_url": "https://github.com/owner/repo/issues/911",
+    \\    "user": {
+    \\      "login": "grace",
+    \\      "html_url": "https://github.com/grace"
+    \\    },
+    \\    "labels": [
+    \\      {
+    \\        "name": "enhancement",
+    \\        "color": "84b6eb"
+    \\      }
+    \\    ],
+    \\    "closed_at": "2024-01-09T12:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 912,
+    \\    "title": "Close unreleased issue",
+    \\    "body": "Closed after the latest release",
+    \\    "html_url": "https://github.com/owner/repo/issues/912",
+    \\    "user": {
+    \\      "login": "heidi",
+    \\      "html_url": "https://github.com/heidi"
+    \\    },
+    \\    "labels": [],
+    \\    "closed_at": "2024-01-16T10:00:00Z"
+    \\  }
+    \\]
+;
+
+pub const test_closed_issues_with_excluded_labels =
+    \\[
+    \\  {
+    \\    "number": 920,
+    \\    "title": "Visible closed issue",
+    \\    "body": "Should remain in the changelog",
+    \\    "html_url": "https://github.com/owner/repo/issues/920",
+    \\    "user": {
+    \\      "login": "ivan",
+    \\      "html_url": "https://github.com/ivan"
+    \\    },
+    \\    "labels": [],
+    \\    "closed_at": "2024-01-14T10:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 921,
+    \\    "title": "Hidden closed issue",
+    \\    "body": "Should be filtered out by exclude-labels",
+    \\    "html_url": "https://github.com/owner/repo/issues/921",
+    \\    "user": {
+    \\      "login": "judy",
+    \\      "html_url": "https://github.com/judy"
+    \\    },
+    \\    "labels": [
+    \\      {
+    \\        "name": "wontfix",
+    \\        "color": "cccccc"
+    \\      }
+    \\    ],
+    \\    "closed_at": "2024-01-14T11:00:00Z"
+    \\  }
+    \\]
+;
+
+pub const test_closed_issues_with_pull_request_marker =
+    \\[
+    \\  {
+    \\    "number": 910,
+    \\    "title": "Close onboarding issue",
+    \\    "body": "Closed before v1.2.0",
+    \\    "html_url": "https://github.com/owner/repo/issues/910",
+    \\    "user": {
+    \\      "login": "frank",
+    \\      "html_url": "https://github.com/frank"
+    \\    },
+    \\    "labels": [],
+    \\    "closed_at": "2024-01-13T09:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 911,
+    \\    "title": "Pull request returned by issues API",
+    \\    "body": "Must be filtered out",
+    \\    "html_url": "https://github.com/owner/repo/pull/911",
+    \\    "user": {
+    \\      "login": "lee",
+    \\      "html_url": "https://github.com/lee"
+    \\    },
+    \\    "labels": [],
+    \\    "closed_at": "2024-01-14T10:00:00Z",
+    \\    "pull_request": {
+    \\      "url": "https://api.github.com/repos/owner/repo/pulls/911"
+    \\    }
+    \\  },
+    \\  {
+    \\    "number": 912,
+    \\    "title": "Close docs issue",
+    \\    "body": "Another real issue payload",
+    \\    "html_url": "https://github.com/owner/repo/issues/912",
+    \\    "user": {
+    \\      "login": "grace",
+    \\      "html_url": "https://github.com/grace"
+    \\    },
+    \\    "labels": [],
+    \\    "closed_at": "2024-01-14T11:00:00Z"
+    \\  }
+    \\]
+;
+
 pub const test_pull_requests_with_excluded_labels =
     \\[
     \\  {
