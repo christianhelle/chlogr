@@ -1,17 +1,18 @@
 # Changelog Generator
 
-A fast, efficient, native CLI tool to automatically generate changelogs from GitHub tags, pull requests, and issues. Written in Zig
+A fast, efficient, native CLI tool to automatically generate changelogs from GitHub tags, merged pull requests, and closed issues. Written in Zig
 
 ## Features
 
 - Fast, compiled binary (zero dependencies, pure Zig stdlib)
 - Generates Markdown changelogs automatically
-- Categorizes entries by labels (Features, Bug Fixes, Other)
+- Groups merged pull requests by labels (Features, Bug Fixes, Merged Pull Requests)
+- Adds a Closed Issues section under each release based on issue close timestamps
 - Links to PRs, issues, and contributors
 - Smart token resolution (--token flag → env vars → `gh auth token` CLI)
 - Works with any GitHub repository
 - Progress output during fetch — per-section headers and page counters keep you informed on large repos
-- Optional parallel fetching (`--parallel <N>`) — fetches releases and PRs concurrently with bounded page concurrency
+- Optional parallel fetching (`--parallel <N>`) — fetches releases, PRs, and closed issues concurrently; release and PR pagination use bounded page concurrency
 - Fully functional core logic verified with integration tests
 
 ## Building
@@ -42,7 +43,7 @@ chlogr --repo [org]/[repo] --token ghp_xxxxxxxxxxxx
 chlogr --repo [org]/[repo] --parallel 4
 ```
 
-Use `--parallel <N>` on large repositories with many releases and pull requests to allow up to `N` concurrent page requests per fetch stream.
+Use `--parallel <N>` on large repositories with many releases, pull requests, and closed issues to fetch all three streams together while letting release and PR pagination use up to `N` concurrent page requests per stream.
 
 ### Options
 
@@ -52,7 +53,7 @@ Use `--parallel <N>` on large repositories with many releases and pull requests 
 - `--since-tag` (optional): Start from this tag/version
 - `--until-tag` (optional): End at this tag/version
 - `--exclude-labels` (optional): Comma-separated labels to exclude (e.g., duplicate,wontfix)
-- `--parallel <N>` (optional): Fetch releases and pull requests concurrently with up to `N` page requests per stream
+- `--parallel <N>` (optional): Fetch releases, pull requests, and closed issues concurrently; release and PR pagination use up to `N` page requests per stream
 
 ### Authentication
 
@@ -70,7 +71,25 @@ If none are available, the tool will display a helpful error message.
 ```markdown
 # Changelog
 
+## [Unreleased Changes]
+
+### Features
+
+- New unreleased feature Y (#126) (@dave)
+
+### Bug Fixes
+
+- Unreleased bug fix (#127) (@eve)
+
+### Merged Pull Requests
+
+- Work in progress change (#999) (@developer)
+
 ## [v1.2.0](https://github.com/owner/repo/releases/tag/v1.2.0) (2024-01-15)
+
+### Merged Pull Requests
+
+- Update documentation (#125) (@charlie)
 
 ### Features
 
@@ -80,13 +99,15 @@ If none are available, the tool will display a helpful error message.
 
 - Fix critical bug (#124) (@bob)
 
-### Other
+### Closed Issues
 
-- Update documentation (#125) (@charlie)
+- Close onboarding issue (#910) (@frank)
 
 ## [v1.1.0](https://github.com/owner/repo/releases/tag/v1.1.0) (2024-01-10)
 
-...
+### Closed Issues
+
+- Close docs issue (#911) (@grace)
 ```
 
 ## Development
@@ -100,8 +121,8 @@ zig build test
 This runs integration tests with mock GitHub data to verify:
 
 - CLI argument parsing (--parallel and all existing flags)
-- JSON parsing of releases and PRs
-- Changelog grouping and categorization
+- JSON parsing of releases, PRs, and closed issues
+- Changelog grouping and categorization for pull requests and closed issues
 - Markdown formatting
 - File output
 
