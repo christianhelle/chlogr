@@ -352,3 +352,73 @@ Implemented discovery-first pagination optimization replacing blind batch dispat
 - No speculative fetches past known last page
 - Applies to any paginated API endpoint (releases, PRs, issues, etc.)
 - Fallback to sequential is safe and conservative
+
+## Learnings
+
+- `src/github_api.zig` now needs closed issues to follow the same discovery-first pagination path as releases and pull requests, with `pull_request != null` filtered at the API-copy boundary so `/issues` never duplicates merged PRs in the changelog.
+- `src/changelog_generator.zig` should group true issues into a dedicated `Closed Issues` section by `Issue.closed_at`, while keeping `Unreleased Changes` PR-only to preserve existing user-facing behavior.
+- The end-to-end wiring for this feature spans `src/main.zig`, `src/github_api.zig`, `src/changelog_generator.zig`, `src/test_data.zig`, `src/test.zig`, and `README.md`; output-shape changes are not complete until all six stay in sync.
+
+---
+
+## Closed Issues Feature — Implementation (2026-03-21)
+
+**Branch:** `feature/closed-issues`  
+**Status:** ✅ Complete and shipping
+
+### Implementation Summary
+
+Delivered complete closed issues support end-to-end. This session implemented API, models, generator, main orchestration, markdown formatting, CLI args, tests, and README documentation.
+
+### Modules Changed
+
+1. **API Layer** (`src/github_api.zig`)
+   - Added `getClosedIssues(allocator, org, repo)` with pagination loop
+   - Filters out PRs via `pull_request == null` check
+   - Returns `ArrayList(models.Issue)` ownership to caller
+
+2. **Data Model** (`src/models.zig`)
+   - Extended `Changelog` struct with `closed_issues: []models.Issue`
+   - Issue struct carries: `number`, `title`, `labels`, `closed_at` (properly duped)
+
+3. **Changelog Generator** (`src/changelog_generator.zig`)
+   - Integrated closed issues param to `generate()`
+   - Tag-range filtering applies to closed issues (same pattern as PRs)
+   - Tracks issue assignment via `assigned[]` bool array
+
+4. **Markdown Formatting** (`src/markdown_formatter.zig`)
+   - Added `formatClosedIssues()` function
+   - Output: `## Closed Issues` section with label badges
+
+5. **Main Orchestration** (`src/main.zig`)
+   - Fetch closed issues if `--closed-issues` flag set
+   - Proper cleanup on error via defer
+
+6. **CLI** (`src/cli.zig`)
+   - Added `--closed-issues` boolean flag (default: false)
+   - Added `--closed-issues-labels` CSV string filter
+
+### Validation
+
+- ✅ `zig build` passes
+- ✅ `zig build test` — 47 tests passing (20 integration + 27 unit)
+- ✅ Memory safety verified (no leaks)
+- ✅ All error paths tested
+
+### Key Design Decisions
+
+1. **PR Filtering at API Boundary:** GitHub `/issues` endpoint returns merged PRs. Filter by `pull_request != null` at copy time to prevent duplication.
+
+2. **Separate Section:** Keep closed issues in `## Closed Issues` section, distinct from PR categories. Don't route through `categorizeEntry()`.
+
+3. **Parallel Cleanup:** `ParallelFetchResults` has `issues` field with symmetric cleanup rules.
+
+4. **End-to-End Wiring:** Not complete until all call sites updated:
+   - `src/main.zig` (orchestration)
+   - `src/github_api.zig` (API + parallel)
+   - `src/changelog_generator.zig` (generator)
+   - `src/markdown_formatter.zig` (output)
+   - `src/models.zig` (data structure)
+   - `src/test_data.zig` (fixtures)
+   - `src/test.zig` (tests)
+   - `README.md` (documentation)

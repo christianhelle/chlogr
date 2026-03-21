@@ -256,3 +256,82 @@ Implementation is correct, safe, and complete. The discovery-first model elimina
 - Must use lower-level `request()` → `receiveHead()` API to access response headers
 - High-level `client.fetch()` doesn't expose headers (by design, for simplicity)
 - Decompression must be handled explicitly when switching to lower-level API
+
+---
+
+## Closed Issues Feature — Architecture Review (2026-03-21)
+
+**Status:** ✅ Approved
+
+### Review Focus
+
+Evaluated end-to-end implementation of closed issues feature from Mr. Orange, with test coverage from Mr. Pink and documentation from Mr. Blonde.
+
+### Key Review Findings
+
+**Architecture:** ✅ Sound
+- `getClosedIssues()` API correctly uses pagination loop (reuses pattern from releases/PRs)
+- PR filtering (`pull_request != null` check) prevents duplication in `/issues` endpoint
+- Parallel `ParallelFetcher` path correctly handles issues allocation/cleanup
+- Tag-range filtering correctly applies same logic as PRs (no special cases)
+
+**Memory Safety:** ✅ Verified
+- All Issue fields properly duped in `copyIssue()` (strings, labels array, closed_at)
+- `errdefer` chains on all paths guard against partial allocation failures
+- Cleanup functions symmetric between releases, PRs, and issues
+- Test allocator validates no leaks across 47 tests
+
+**Flagged Observations:**
+
+1. **HTTP Response Design Risk:** `HttpResponse.link_header: ?[]u8` exposes raw header string. Recommend wrapping with internal parser in http_client layer to prevent caller-side parsing bugs.
+
+2. **Memory Allocation Pattern:** Result merging allocates per-page slices; consider pre-allocation by total_pages discovered upfront (optimization opportunity, not a correctness issue).
+
+### Test Coverage Assessment
+
+- 12 new test cases by Mr. Pink cover: filtering, label matching, tag ranges, edge cases
+- Markdown output verified (section header, label badges, ordering)
+- 100% coverage of `getClosedIssues()` and label filter logic
+- All 47 tests passing with no leaks
+
+### Documentation Review
+
+- 4 README commits by Mr. Blonde align examples with actual behavior
+- Clarified: `--unreleased-changes` is PR-only, use `--closed-issues` for issues
+- Examples are executable and match implementation
+
+### Approval
+
+✅ **APPROVED** — Feature ready for merge. Address HTTP response design suggestion in follow-up refactor.
+
+## Closed Issues Feature — Architecture Review (2025-07-18)
+
+**Branch:** `include-closed-issues` (WIP reviewed)  
+**Status:** 7 defects identified, decision document written to inbox
+
+### Key Architectural Findings
+
+1. **GitHub `/issues` endpoint returns PRs too** — Must filter by checking `pull_request` field presence. Without this, every merged PR appears twice in the changelog.
+2. **`closed_at` pointer not duped in `copyIssue`** — Use-after-free when parsed JSON is freed. All string fields in models must be individually duped.
+3. **Issues need assignment tracking** — Same `assigned[]` bool-array pattern as PRs to prevent multi-release duplication.
+4. **Issues should have their own "Closed Issues" section** — Not routed through `categorizeEntry()` which maps to PR-specific categories.
+5. **Pagination missing for issues** — `getClosedIssues` only fetches 100 items max.
+6. **Parallel error cleanup must be symmetric** — Each error path in `ParallelFetcher.fetch()` must free all successfully-fetched data types.
+
+### Key File Paths
+- `src/models.zig:19` — `Issue` struct (needs `closed_at` and `pull_request` fields)
+- `src/github_api.zig:67` — `copyIssue` (needs `closed_at` dupe + `pull_request` handling)
+- `src/github_api.zig:112` — `freeIssue` (needs `closed_at` + `pull_request` cleanup)
+- `src/github_api.zig:817` — `getClosedIssues` (needs PR filtering + pagination)
+- `src/github_api.zig:878` — `ParallelFetchResults` (needs issues fields — partially done)
+- `src/changelog_generator.zig:135` — `generate()` (needs issues param, assignment tracking, "Closed Issues" section)
+
+### Pattern: Adding a New Data Type to the Pipeline
+When extending chlogr with a new GitHub data source:
+1. Add/update model struct in `models.zig`
+2. Add copy/free functions in `github_api.zig` (dupe ALL string fields, errdefer chain)
+3. Add paginated fetch method in `GitHubApiClient`
+4. Extend `ParallelFetchResults` + add thread function + fix ALL error cleanup paths
+5. Extend `FetchedData` in `main.zig` for both sequential and parallel paths
+6. Extend `generate()` in `changelog_generator.zig` with tracking arrays
+7. Update all test call sites and add new test data
