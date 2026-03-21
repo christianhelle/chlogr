@@ -4,6 +4,66 @@ const changelog_generator = @import("changelog_generator.zig");
 const markdown_formatter = @import("markdown_formatter.zig");
 const test_data = @import("test_data.zig");
 
+fn parseIssues(
+    allocator: std.mem.Allocator,
+    source: []const u8,
+) !std.json.Parsed([]models.Issue) {
+    return std.json.parseFromSlice([]models.Issue, allocator, source, .{});
+}
+
+fn findRelease(
+    releases: []const changelog_generator.ChangelogRelease,
+    version: []const u8,
+) ?*const changelog_generator.ChangelogRelease {
+    for (releases) |*release| {
+        if (std.mem.eql(u8, release.version, version)) {
+            return release;
+        }
+    }
+    return null;
+}
+
+fn findSection(
+    sections: []const changelog_generator.ChangelogSection,
+    name: []const u8,
+) ?*const changelog_generator.ChangelogSection {
+    for (sections) |*section| {
+        if (std.mem.eql(u8, section.name, name)) {
+            return section;
+        }
+    }
+    return null;
+}
+
+fn sectionContainsEntry(
+    section: changelog_generator.ChangelogSection,
+    number: u32,
+) bool {
+    for (section.entries) |entry| {
+        if (entry.number == number) return true;
+    }
+    return false;
+}
+
+fn changelogContainsEntry(
+    changelog: changelog_generator.Changelog,
+    number: u32,
+) bool {
+    for (changelog.releases) |release| {
+        for (release.sections) |section| {
+            if (sectionContainsEntry(section, number)) return true;
+        }
+    }
+
+    if (changelog.unreleased) |unreleased| {
+        for (unreleased.sections) |section| {
+            if (sectionContainsEntry(section, number)) return true;
+        }
+    }
+
+    return false;
+}
+
 fn testBasicChangelogGeneration() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -278,6 +338,57 @@ fn testMarkdownFormatterWithUnreleased() !void {
     try std.testing.expect(std.mem.indexOf(u8, markdown, "Unreleased bug fix") != null);
 }
 
+fn testExcludeLabelsAlsoAppliesToClosedIssues() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_empty_prs,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    var issues_parsed = try std.json.parseFromSlice(
+        []models.Issue,
+        allocator,
+        test_data.test_closed_issues_with_excluded_labels,
+        .{},
+    );
+    defer issues_parsed.deinit();
+    const issues = issues_parsed.value;
+
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, "wontfix");
+    const changelog = try gen.generateWithIssues(releases, prs, issues);
+    defer gen.deinitChangelog(changelog);
+
+    var found_visible = false;
+    var found_hidden = false;
+    for (changelog.releases) |release| {
+        for (release.sections) |section| {
+            for (section.entries) |entry| {
+                if (entry.number == 920) found_visible = true;
+                if (entry.number == 921) found_hidden = true;
+            }
+        }
+    }
+
+    try std.testing.expect(found_visible);
+    try std.testing.expect(!found_hidden);
+}
+
 fn testMarkdownFormatterWithoutUnreleased() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -310,6 +421,112 @@ fn testMarkdownFormatterWithoutUnreleased() !void {
     defer formatter.deinit(markdown);
 
     try std.testing.expect(std.mem.indexOf(u8, markdown, "Unreleased Changes") == null);
+}
+
+fn testClosedIssuesGroupedByRelease() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var issues_parsed = try parseIssues(allocator, test_data.test_closed_issues);
+    defer issues_parsed.deinit();
+    const issues = issues_parsed.value;
+
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    const changelog = try gen.generateWithIssues(releases, &[_]models.PullRequest{}, issues);
+    defer gen.deinitChangelog(changelog);
+
+    const v1_2_0 = findRelease(changelog.releases, "v1.2.0") orelse return error.MissingRelease;
+    const v1_2_0_closed = findSection(v1_2_0.sections, "Closed Issues") orelse return error.MissingClosedIssuesSection;
+    try std.testing.expect(sectionContainsEntry(v1_2_0_closed.*, 910));
+    try std.testing.expect(!sectionContainsEntry(v1_2_0_closed.*, 911));
+    try std.testing.expect(findSection(v1_2_0.sections, "Bug Fixes") == null);
+
+    const v1_1_0 = findRelease(changelog.releases, "v1.1.0") orelse return error.MissingRelease;
+    const v1_1_0_closed = findSection(v1_1_0.sections, "Closed Issues") orelse return error.MissingClosedIssuesSection;
+    try std.testing.expect(sectionContainsEntry(v1_1_0_closed.*, 911));
+    try std.testing.expect(!sectionContainsEntry(v1_1_0_closed.*, 910));
+    try std.testing.expect(findSection(v1_1_0.sections, "Features") == null);
+
+    try std.testing.expect(changelog.unreleased == null);
+    try std.testing.expect(!changelogContainsEntry(changelog, 912));
+}
+
+fn testMarkdownFormatterIncludesClosedIssuesSection() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_pull_requests,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+
+    var issues_parsed = try parseIssues(allocator, test_data.test_closed_issues);
+    defer issues_parsed.deinit();
+    const issues = issues_parsed.value;
+
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    const changelog = try gen.generateWithIssues(releases, prs, issues);
+    defer gen.deinitChangelog(changelog);
+
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, "testowner/testrepo");
+    const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
+    defer formatter.deinit(markdown);
+
+    try std.testing.expect(std.mem.indexOf(u8, markdown, "### Closed Issues") != null);
+    try std.testing.expect(std.mem.indexOf(u8, markdown, "Close onboarding issue") != null);
+    try std.testing.expect(std.mem.indexOf(u8, markdown, "Close docs issue") != null);
+    try std.testing.expect(std.mem.indexOf(u8, markdown, "Close unreleased issue") == null);
+}
+
+fn testClosedIssuesExcludePullRequestEntries() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var issues_parsed = try parseIssues(allocator, test_data.test_closed_issues_with_pull_request_marker);
+    defer issues_parsed.deinit();
+    const issues = issues_parsed.value;
+
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    const changelog = try gen.generateWithIssues(releases, &[_]models.PullRequest{}, issues);
+    defer gen.deinitChangelog(changelog);
+
+    try std.testing.expect(changelogContainsEntry(changelog, 910));
+    try std.testing.expect(changelogContainsEntry(changelog, 912));
+    try std.testing.expect(!changelogContainsEntry(changelog, 911));
 }
 
 fn testCategorization() !void {
@@ -803,6 +1020,22 @@ pub fn main() !void {
     try testMarkdownFormatterWithoutUnreleased();
     std.debug.print("  PASSED\n", .{});
 
+    std.debug.print("Running testClosedIssuesGroupedByRelease...\n", .{});
+    try testClosedIssuesGroupedByRelease();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testMarkdownFormatterIncludesClosedIssuesSection...\n", .{});
+    try testMarkdownFormatterIncludesClosedIssuesSection();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testClosedIssuesExcludePullRequestEntries...\n", .{});
+    try testClosedIssuesExcludePullRequestEntries();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testExcludeLabelsAlsoAppliesToClosedIssues...\n", .{});
+    try testExcludeLabelsAlsoAppliesToClosedIssues();
+    std.debug.print("  PASSED\n", .{});
+
     std.debug.print("Running testCategorization...\n", .{});
     try testCategorization();
     std.debug.print("  PASSED\n", .{});
@@ -886,9 +1119,22 @@ pub fn main() !void {
         }
     }
 
+    std.debug.print("\nParsing mock closed issues...\n", .{});
+    var issues_parsed = try parseIssues(allocator, test_data.test_closed_issues);
+    defer issues_parsed.deinit();
+    const issues = issues_parsed.value;
+
+    std.debug.print("Found {d} closed issues\n", .{issues.len});
+    for (issues) |issue| {
+        std.debug.print("  - #{d}: {s} by @{s}\n", .{ issue.number, issue.title, issue.user.login });
+        for (issue.labels) |label| {
+            std.debug.print("      Label: {s}\n", .{label.name});
+        }
+    }
+
     std.debug.print("\nGenerating changelog...\n", .{});
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generateWithIssues(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     std.debug.print("Generated {d} releases in changelog\n", .{changelog.releases.len});
