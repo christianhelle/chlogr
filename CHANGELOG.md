@@ -2,6 +2,12 @@
 
 ## [Unreleased Changes]
 
+### Features
+- Include closed issues in changelog ([#43](https://github.com/christianhelle/chlogr/pull/43)) ([@christianhelle](https://github.com/christianhelle/))
+
+
+## [0.3.6](https://github.com/christianhelle/chlogr/releases/tag/0.3.6) (2026-03-20)
+
 ### Merged Pull Requests
 - docs: update README with --parallel flag and progress output ([#37](https://github.com/christianhelle/chlogr/pull/37)) ([@christianhelle](https://github.com/christianhelle/))
 - docs: add README hygiene rule to copilot instructions ([#38](https://github.com/christianhelle/chlogr/pull/38)) ([@christianhelle](https://github.com/christianhelle/))
@@ -16,8 +22,18 @@
 - feat: add --parallel flag to CLI argument parsing ([#32](https://github.com/christianhelle/chlogr/pull/32)) ([@christianhelle](https://github.com/christianhelle/))
 - feat: add link to non-bot pr authors in output changelog ([#39](https://github.com/christianhelle/chlogr/pull/39)) ([@christianhelle](https://github.com/christianhelle/))
 
+### Closed Issues
+- feat: show per-fetcher progress and completion in parallel mode ([#31](https://github.com/christianhelle/chlogr/issues/31)) ([@christianhelle](https://github.com/christianhelle/))
+- feat: wire --parallel flag into main.zig fetch path ([#30](https://github.com/christianhelle/chlogr/issues/30)) ([@christianhelle](https://github.com/christianhelle/))
+- feat: implement parallel data fetching with std.Thread ([#29](https://github.com/christianhelle/chlogr/issues/29)) ([@christianhelle](https://github.com/christianhelle/))
+- feat: add --parallel flag to CLI argument parsing ([#27](https://github.com/christianhelle/chlogr/issues/27)) ([@christianhelle](https://github.com/christianhelle/))
+- feat: add progress messages during sequential fetch ([#28](https://github.com/christianhelle/chlogr/issues/28)) ([@christianhelle](https://github.com/christianhelle/))
+
 
 ## [0.2.5](https://github.com/christianhelle/chlogr/releases/tag/0.2.5) (2026-03-18)
+
+### Merged Pull Requests
+- chore: add copilot instructions for agent workflow ([#15](https://github.com/christianhelle/chlogr/pull/15)) ([@christianhelle](https://github.com/christianhelle/))
 
 ### Features
 - fix: add errdefer cleanup to GitHub API deep-copy allocation paths (#6) ([#20](https://github.com/christianhelle/chlogr/pull/20)) ([@christianhelle](https://github.com/christianhelle/))
@@ -31,13 +47,23 @@
 - feat: implement --since-tag and --until-tag filtering (#8) ([#18](https://github.com/christianhelle/chlogr/pull/18)) ([@christianhelle](https://github.com/christianhelle/))
 - fix: safe section-map initialization and propagate allocation failures (#3) ([#17](https://github.com/christianhelle/chlogr/pull/17)) ([@christianhelle](https://github.com/christianhelle/))
 - fix: harden gh token resolution against panics and stderr deadlock (#4) ([#16](https://github.com/christianhelle/chlogr/pull/16)) ([@christianhelle](https://github.com/christianhelle/))
-- chore: add copilot instructions for agent workflow ([#15](https://github.com/christianhelle/chlogr/pull/15)) ([@christianhelle](https://github.com/christianhelle/))
+
+### Closed Issues
+- [P3] Reduce allocation churn and repeated scans in changelog generation and formatting ([#11](https://github.com/christianhelle/chlogr/issues/11)) ([@christianhelle](https://github.com/christianhelle/))
+- [P2] Use the actual repository slug when rendering release links ([#10](https://github.com/christianhelle/chlogr/issues/10)) ([@christianhelle](https://github.com/christianhelle/))
+- [P1] Parse --exclude-labels as exact CSV tokens instead of substring matches ([#9](https://github.com/christianhelle/chlogr/issues/9)) ([@christianhelle](https://github.com/christianhelle/))
+- [P1] Implement or reject the advertised --since-tag and --until-tag flags ([#8](https://github.com/christianhelle/chlogr/issues/8)) ([@christianhelle](https://github.com/christianhelle/))
+- [P1] Implement pagination for releases and merged pull requests ([#7](https://github.com/christianhelle/chlogr/issues/7)) ([@christianhelle](https://github.com/christianhelle/))
+- [P1] Assign each merged PR to exactly one release and compare full timestamps ([#5](https://github.com/christianhelle/chlogr/issues/5)) ([@christianhelle](https://github.com/christianhelle/))
+- [P1] Add allocation-failure cleanup to GitHub API deep-copy paths ([#6](https://github.com/christianhelle/chlogr/issues/6)) ([@christianhelle](https://github.com/christianhelle/))
+- [P0] Fix unsafe section-map initialization and silent allocation drops in changelog generation ([#3](https://github.com/christianhelle/chlogr/issues/3)) ([@christianhelle](https://github.com/christianhelle/))
+- [P0] Harden gh token resolution against abnormal exits and stderr deadlocks ([#4](https://github.com/christianhelle/chlogr/issues/4)) ([@christianhelle](https://github.com/christianhelle/))
 
 
 ## [0.1.4](https://github.com/christianhelle/chlogr/releases/tag/0.1.4) (2026-03-18)
 
 ### Features
-- Remove time from release dates in output ([#12](https://github.com/christianhelle/chlogr/pull/12)) ([@christianhelle](https://github.com/christianhelle/))
+- feat: remove time from release dates in output ([#12](https://github.com/christianhelle/chlogr/pull/12)) ([@christianhelle](https://github.com/christianhelle/))
 
 
 ## [0.1.3](https://github.com/christianhelle/chlogr/releases/tag/0.1.3) (2026-03-17)
