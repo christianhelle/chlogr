@@ -28,6 +28,14 @@ pub const Changelog = struct {
     unreleased: ?UnreleasedChanges,
 };
 
+const closed_issues_section_name = "Closed Issues";
+const section_order = [_][]const u8{
+    "Merged Pull Requests",
+    "Features",
+    "Bug Fixes",
+    closed_issues_section_name,
+};
+
 pub const ChangelogGenerator = struct {
     allocator: std.mem.Allocator,
     exclude_labels: ?[]const u8 = null,
@@ -94,7 +102,7 @@ pub const ChangelogGenerator = struct {
 
     /// Check if an entry should be excluded based on labels.
     /// The exclude_labels string is a comma-separated list of tokens; each token is
-    /// trimmed of whitespace and compared against PR label names using exact equality.
+    /// trimmed of whitespace and compared against entry label names using exact equality.
     fn shouldExclude(self: ChangelogGenerator, labels: []models.Label) bool {
         if (self.exclude_labels == null) return false;
 
@@ -112,7 +120,7 @@ pub const ChangelogGenerator = struct {
         return false;
     }
 
-    /// Categorize PR/issue based on labels
+    /// Categorize pull requests based on labels.
     fn categorizeEntry(_: ChangelogGenerator, labels: []models.Label) []const u8 {
         for (labels) |label| {
             if (std.mem.eql(u8, label.name, "feature") or std.mem.eql(u8, label.name, "enhancement")) {
@@ -128,6 +136,45 @@ pub const ChangelogGenerator = struct {
         return std.mem.lessThan(u8, a.published_at, b.published_at);
     }
 
+    fn appendSectionEntry(
+        self: ChangelogGenerator,
+        sections_map: *std.StringHashMap(std.ArrayListUnmanaged(ChangelogEntry)),
+        section_name: []const u8,
+        entry: ChangelogEntry,
+    ) !void {
+        var gop = try sections_map.getOrPut(section_name);
+        if (!gop.found_existing) {
+            gop.value_ptr.* = .empty;
+        }
+
+        try gop.value_ptr.append(self.allocator, entry);
+    }
+
+    fn buildSections(
+        self: ChangelogGenerator,
+        sections_map: *std.StringHashMap(std.ArrayListUnmanaged(ChangelogEntry)),
+    ) ![]ChangelogSection {
+        var sections_array = try std.ArrayList(ChangelogSection).initCapacity(
+            self.allocator,
+            sections_map.count(),
+        );
+
+        inline for (section_order) |section_name| {
+            if (sections_map.getPtr(section_name)) |entries| {
+                sections_array.appendAssumeCapacity(.{
+                    .name = section_name,
+                    .entries = try entries.toOwnedSlice(self.allocator),
+                });
+            }
+        }
+
+        return try sections_array.toOwnedSlice(self.allocator);
+    }
+
+    fn shouldSkipIssue(self: ChangelogGenerator, issue: models.Issue) bool {
+        return self.shouldExclude(issue.labels) or issue.pull_request != null;
+    }
+
     /// Generate changelog from releases and PRs.
     /// Each PR is assigned to exactly one release: the earliest release whose
     /// published_at >= pr.merged_at (full ISO 8601 lexicographic comparison).
@@ -137,29 +184,42 @@ pub const ChangelogGenerator = struct {
         releases: []models.Release,
         prs: []models.PullRequest,
     ) !Changelog {
+        return self.generateWithIssues(releases, prs, &[_]models.Issue{});
+    }
+
+    /// Generate changelog from releases, pull requests, and closed issues.
+    /// Issues are assigned to the earliest release whose published_at >= issue.closed_at.
+    /// Issues without a qualifying release are omitted so unreleased output remains PR-only.
+    pub fn generateWithIssues(
+        self: ChangelogGenerator,
+        releases: []models.Release,
+        prs: []models.PullRequest,
+        issues: []models.Issue,
+    ) !Changelog {
         // Apply tag-range filter before assignment so --since-tag/--until-tag
         // restrict which releases are considered.
         const filtered = try self.filterReleasesByTagRange(releases);
 
-        // Sort releases oldest-first so a greedy single pass assigns each PR to the
-        // earliest qualifying release, guaranteeing exactly one assignment per PR.
-        // The result is reversed at the end so releases appear newest-first in the output.
+        // Sort releases oldest-first so a greedy single pass assigns each PR/issue to
+        // the earliest qualifying release. The result is reversed at the end so
+        // releases appear newest-first in the output.
         const sorted = try self.allocator.dupe(models.Release, filtered);
         defer self.allocator.free(sorted);
         std.mem.sort(models.Release, sorted, {}, releaseOldestFirst);
 
-        // Track which PRs have been assigned to prevent duplicate entries.
-        const assigned = try self.allocator.alloc(bool, prs.len);
-        defer self.allocator.free(assigned);
-        @memset(assigned, false);
+        const assigned_prs = try self.allocator.alloc(bool, prs.len);
+        defer self.allocator.free(assigned_prs);
+        @memset(assigned_prs, false);
+
+        const assigned_issues = try self.allocator.alloc(bool, issues.len);
+        defer self.allocator.free(assigned_issues);
+        @memset(assigned_issues, false);
 
         var result = try std.ArrayList(ChangelogRelease).initCapacity(self.allocator, sorted.len);
 
         for (sorted) |release| {
-            // Only 3 possible categories (Features, Bug Fixes, Merged Pull Requests);
-            // pre-reserve to avoid rehashing during the PR scan.
             var sections_map = std.StringHashMap(std.ArrayListUnmanaged(ChangelogEntry)).init(self.allocator);
-            try sections_map.ensureTotalCapacity(3);
+            try sections_map.ensureTotalCapacity(4);
             defer {
                 var it = sections_map.iterator();
                 while (it.next()) |entry| {
@@ -169,54 +229,44 @@ pub const ChangelogGenerator = struct {
             }
 
             for (prs, 0..) |pr, i| {
-                if (assigned[i]) continue;
+                if (assigned_prs[i]) continue;
                 if (self.shouldExclude(pr.labels)) continue;
                 const merged_at = pr.merged_at orelse continue;
-                // Assign to this release if merged_at <= release.published_at.
                 if (std.mem.order(u8, merged_at, release.published_at) == .gt) continue;
 
-                assigned[i] = true;
-                const category = self.categorizeEntry(pr.labels);
-
-                var gop = try sections_map.getOrPut(category);
-                if (!gop.found_existing) {
-                    gop.value_ptr.* = .empty;
-                }
-
-                const entry = ChangelogEntry{
+                assigned_prs[i] = true;
+                try self.appendSectionEntry(&sections_map, self.categorizeEntry(pr.labels), .{
                     .title = pr.title,
                     .url = pr.html_url,
                     .author = pr.user.login,
                     .number = pr.number,
-                };
-
-                try gop.value_ptr.append(self.allocator, entry);
+                });
             }
 
-            var sections_array = try std.ArrayList(ChangelogSection).initCapacity(self.allocator, sections_map.count());
+            for (issues, 0..) |issue, i| {
+                if (assigned_issues[i]) continue;
+                if (self.shouldSkipIssue(issue)) continue;
+                const closed_at = issue.closed_at orelse continue;
+                if (std.mem.order(u8, closed_at, release.published_at) == .gt) continue;
 
-            var it = sections_map.iterator();
-            while (it.next()) |entry| {
-                const changelog_section = ChangelogSection{
-                    .name = entry.key_ptr.*,
-                    .entries = try entry.value_ptr.toOwnedSlice(self.allocator),
-                };
-                sections_array.appendAssumeCapacity(changelog_section);
+                assigned_issues[i] = true;
+                try self.appendSectionEntry(&sections_map, closed_issues_section_name, .{
+                    .title = issue.title,
+                    .url = issue.html_url,
+                    .author = issue.user.login,
+                    .number = issue.number,
+                });
             }
 
-            const release_entry = ChangelogRelease{
+            result.appendAssumeCapacity(.{
                 .version = release.tag_name,
                 .date = release.published_at,
-                .sections = try sections_array.toOwnedSlice(self.allocator),
-            };
-
-            result.appendAssumeCapacity(release_entry);
+                .sections = try self.buildSections(&sections_map),
+            });
         }
 
         std.mem.reverse(ChangelogRelease, result.items);
 
-        // Collect any PRs not yet assigned to a release into unreleased.
-        // Pre-reserve for 3 categories to avoid rehashing.
         var unreleased_sections_map = std.StringHashMap(std.ArrayListUnmanaged(ChangelogEntry)).init(self.allocator);
         try unreleased_sections_map.ensureTotalCapacity(3);
         defer {
@@ -229,47 +279,30 @@ pub const ChangelogGenerator = struct {
 
         var has_unreleased = false;
         for (prs, 0..) |pr, i| {
-            if (assigned[i]) continue;
+            if (assigned_prs[i]) continue;
             if (self.shouldExclude(pr.labels)) continue;
             if (pr.merged_at == null) continue;
 
             has_unreleased = true;
-            const category = self.categorizeEntry(pr.labels);
-
-            var gop = try unreleased_sections_map.getOrPut(category);
-            if (!gop.found_existing) {
-                gop.value_ptr.* = .empty;
-            }
-
-            const entry = ChangelogEntry{
+            try self.appendSectionEntry(&unreleased_sections_map, self.categorizeEntry(pr.labels), .{
                 .title = pr.title,
                 .url = pr.html_url,
                 .author = pr.user.login,
                 .number = pr.number,
-            };
-
-            try gop.value_ptr.append(self.allocator, entry);
+            });
         }
 
         var unreleased: ?UnreleasedChanges = null;
         if (has_unreleased) {
-            var unreleased_sections_array = try std.ArrayList(ChangelogSection).initCapacity(self.allocator, unreleased_sections_map.count());
-
-            var it = unreleased_sections_map.iterator();
-            while (it.next()) |entry| {
-                const changelog_section = ChangelogSection{
-                    .name = entry.key_ptr.*,
-                    .entries = try entry.value_ptr.toOwnedSlice(self.allocator),
-                };
-                unreleased_sections_array.appendAssumeCapacity(changelog_section);
-            }
-
             unreleased = UnreleasedChanges{
-                .sections = try unreleased_sections_array.toOwnedSlice(self.allocator),
+                .sections = try self.buildSections(&unreleased_sections_map),
             };
         }
 
-        return Changelog{ .releases = try result.toOwnedSlice(self.allocator), .unreleased = unreleased };
+        return Changelog{
+            .releases = try result.toOwnedSlice(self.allocator),
+            .unreleased = unreleased,
+        };
     }
 
     pub fn deinitChangelog(self: ChangelogGenerator, changelog: Changelog) void {
