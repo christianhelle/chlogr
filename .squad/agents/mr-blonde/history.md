@@ -350,3 +350,59 @@ Executed comprehensive audit and bulk sync of all closed PRs authored by `christ
 - **GitHub API quirks are documented** — PR metadata uses issues API namespace
 - **Batching strategy works** — three parallel batches captured all 27 PRs without gaps
 - **Audit creates baseline** — automated PR workflow now builds on consistent metadata foundation
+
+---
+
+## Session: README Hygiene for Closed Issues Feature (2026-03-21)
+
+**Date:** 2026-03-21
+**Task:** Align README examples with shipped closed issues behavior
+**Status:** ✅ Complete
+
+### Problem
+
+README example showed `--unreleased-changes` capturing both PRs *and* closed issues, but implementation kept unreleased changes PR-only (closed issues appear only in dedicated section when `--closed-issues` flag set).
+
+### Solution
+
+4 commits realigning README with actual behavior:
+
+**Batch 1:** Updated unreleased changes example
+- Removed closed issues from "Unreleased Changes" section
+- Added note: "Use `--closed-issues` flag for separate closed issues section"
+
+**Batch 2:** Clarified option descriptions
+- Added note to `--unreleased-changes`: "Captures only merged pull requests since last release"
+- Cross-referenced `--closed-issues` and `--closed-issues-labels`
+
+**Batch 3:** Updated feature list
+- Reworded "Unreleased Changes": "PRs merged since last release"
+- Clarified "Closed Issues": "Optional section (use `--closed-issues` flag)"
+
+**Batch 4:** Added new usage example
+- `chlogr gen --closed-issues --closed-issues-labels "bug,docs"`
+- Output shows both "Unreleased Changes" (PRs) and "Closed Issues" sections
+- Positioned after existing examples
+
+### Validation
+
+```
+zig build
+✅ No compiler errors
+✅ Documentation changes verified
+✅ Example outputs executable
+✅ Flag descriptions accurate
+```
+
+### Key Pattern
+
+When feature flags interact (`--closed-issues`, `--closed-issues-labels`, `--unreleased-changes`), documentation must:
+1. Explicitly clarify scope of each flag
+2. Show examples combining related flags
+3. Note whether features are exclusive or complementary
+
+### Learnings
+
+- **Documentation timing:** Review README against implementation *before* shipping to catch divergence
+- **Flag clarity:** Related flags need cross-references in help text
+- **Example completeness:** Show at least one example combining each related flag set
