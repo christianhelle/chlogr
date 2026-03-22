@@ -45,6 +45,14 @@ chlogr --repo [org]/[repo] --parallel 4
 
 Use `--parallel <N>` on large repositories with many releases, pull requests, and closed issues to fetch all three streams together while letting release and PR pagination use up to `N` concurrent page requests per stream.
 
+### With Closed Issues
+
+```bash
+chlogr --repo [org]/[repo] --closed-issues
+```
+
+Use `--closed-issues` to include closed issues in the changelog. Issues are filtered from the `/issues` endpoint and grouped by the release they were closed in.
+
 ### Options
 
 - `--repo` (required): GitHub repository in the format `[Organization or Username]/[Repository name]`
@@ -53,7 +61,7 @@ Use `--parallel <N>` on large repositories with many releases, pull requests, an
 - `--since-tag` (optional): Start from this tag/version
 - `--until-tag` (optional): End at this tag/version
 - `--exclude-labels` (optional): Comma-separated labels to exclude (e.g., duplicate,wontfix)
-- `--parallel <N>` (optional): Fetch releases, pull requests, and closed issues concurrently; release and PR pagination use up to `N` page requests per stream
+- `--parallel <N>` (optional, default: 4): Fetch releases, pull requests, and closed issues concurrently; release and PR pagination use up to `N` page requests per stream
 
 ### Authentication
 

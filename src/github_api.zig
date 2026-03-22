@@ -428,6 +428,7 @@ fn PageResult(comptime T: type) type {
     return struct {
         items: []T,
         pagination: PaginationInfo,
+        raw_page_count: usize,
     };
 }
 
@@ -590,6 +591,7 @@ pub const GitHubApiClient = struct {
         return .{
             .items = try releases.toOwnedSlice(self.allocator),
             .pagination = parsePaginationInfo(response.link_header),
+            .raw_page_count = parsed.value.len,
         };
     }
 
@@ -631,6 +633,7 @@ pub const GitHubApiClient = struct {
         return .{
             .items = try prs.toOwnedSlice(self.allocator),
             .pagination = parsePaginationInfo(response.link_header),
+            .raw_page_count = parsed.value.len,
         };
     }
 
@@ -657,6 +660,7 @@ pub const GitHubApiClient = struct {
         return .{
             .items = try copyClosedIssues(self.allocator, parsed.value),
             .pagination = parsePaginationInfo(response.link_header),
+            .raw_page_count = parsed.value.len,
         };
     }
 
@@ -720,7 +724,7 @@ pub const GitHubApiClient = struct {
             }
 
             const page_result = try self.fetchReleasePage(page);
-            const page_len = page_result.items.len;
+            const raw_page_count = page_result.raw_page_count;
             const pagination = page_result.pagination;
 
             if (pagination.last_page) |discovered_last_page| {
@@ -733,7 +737,7 @@ pub const GitHubApiClient = struct {
                 if (page >= known_last) break;
             } else if (pagination.header_present) {
                 if (!pagination.has_next) break;
-            } else if (page_len < github_page_size_usize) {
+            } else if (raw_page_count < github_page_size_usize) {
                 break;
             }
         }
@@ -768,7 +772,7 @@ pub const GitHubApiClient = struct {
             }
 
             const page_result = try self.fetchPullRequestPage(page);
-            const page_len = page_result.items.len;
+            const raw_page_count = page_result.raw_page_count;
             const pagination = page_result.pagination;
 
             if (pagination.last_page) |discovered_last_page| {
@@ -781,7 +785,7 @@ pub const GitHubApiClient = struct {
                 if (page >= known_last) break;
             } else if (pagination.header_present) {
                 if (!pagination.has_next) break;
-            } else if (page_len < github_page_size_usize) {
+            } else if (raw_page_count < github_page_size_usize) {
                 break;
             }
         }
@@ -816,7 +820,7 @@ pub const GitHubApiClient = struct {
             }
 
             const page_result = try self.fetchIssuePage(page);
-            const page_len = page_result.items.len;
+            const raw_page_count = page_result.raw_page_count;
             const pagination = page_result.pagination;
 
             if (pagination.last_page) |discovered_last_page| {
@@ -829,7 +833,7 @@ pub const GitHubApiClient = struct {
                 if (page >= known_last) break;
             } else if (pagination.header_present) {
                 if (!pagination.has_next) break;
-            } else if (page_len < github_page_size_usize) {
+            } else if (raw_page_count < github_page_size_usize) {
                 break;
             }
         }
