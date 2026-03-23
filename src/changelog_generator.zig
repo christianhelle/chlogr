@@ -158,6 +158,12 @@ pub const ChangelogGenerator = struct {
             self.allocator,
             sections_map.count(),
         );
+        errdefer {
+            for (sections_array.items) |section| {
+                self.allocator.free(section.entries);
+            }
+            sections_array.deinit(self.allocator);
+        }
 
         inline for (section_order) |section_name| {
             if (sections_map.getPtr(section_name)) |entries| {
@@ -216,6 +222,15 @@ pub const ChangelogGenerator = struct {
         @memset(assigned_issues, false);
 
         var result = try std.ArrayList(ChangelogRelease).initCapacity(self.allocator, sorted.len);
+        errdefer {
+            for (result.items) |release| {
+                for (release.sections) |section| {
+                    self.allocator.free(section.entries);
+                }
+                self.allocator.free(release.sections);
+            }
+            result.deinit(self.allocator);
+        }
 
         for (sorted) |release| {
             var sections_map = std.StringHashMap(std.ArrayListUnmanaged(ChangelogEntry)).init(self.allocator);
@@ -293,6 +308,12 @@ pub const ChangelogGenerator = struct {
         }
 
         var unreleased: ?UnreleasedChanges = null;
+        errdefer if (unreleased) |un| {
+            for (un.sections) |section| {
+                self.allocator.free(section.entries);
+            }
+            self.allocator.free(un.sections);
+        };
         if (has_unreleased) {
             unreleased = UnreleasedChanges{
                 .sections = try self.buildSections(&unreleased_sections_map),

@@ -96,16 +96,19 @@ pub fn main() !void {
             }
             return err;
         };
+        errdefer api_client.freeReleases(releases);
         std.debug.print("Fetching pull requests...\n", .{});
         const prs = api_client.getMergedPullRequests() catch |err| {
             std.debug.print("Error fetching pull requests: {}\n", .{err});
             return err;
         };
+        errdefer api_client.freePullRequests(prs);
         std.debug.print("Fetching closed issues...\n", .{});
         const issues = api_client.getClosedIssues() catch |err| {
             std.debug.print("Error fetching closed issues: {}\n", .{err});
             return err;
         };
+        errdefer api_client.freeIssues(issues);
         break :blk .{ .releases = releases, .prs = prs, .issues = issues };
     };
     defer api_client.freeReleases(fetched.releases);
