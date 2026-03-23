@@ -8,7 +8,7 @@ fn parseIssues(
     allocator: std.mem.Allocator,
     source: []const u8,
 ) !std.json.Parsed([]models.Issue) {
-    return std.json.parseFromSlice([]models.Issue, allocator, source, .{});
+    return std.json.parseFromSlice([]models.Issue, allocator, source, .{ .ignore_unknown_fields = true });
 }
 
 fn findRelease(
