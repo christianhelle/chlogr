@@ -35,5 +35,5 @@ jobs:
           git config --global user.name "Continuous Integration"
           git config --global user.email "username@users.noreply.github.com"
           git add CHANGELOG.md
-          git commit -m "Update changelog [skip ci]"
+          git commit -m "ci: update changelog [skip ci]"
           git push
