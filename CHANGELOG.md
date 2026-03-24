@@ -14,13 +14,15 @@
 
 ### Features
 - feat: optimize parallel pagination with link-aware discovery ([#42](https://github.com/christianhelle/chlogr/pull/42)) ([@christianhelle](https://github.com/christianhelle/))
-- fix: support arbitrary degree of parallelism in parallel PR fetcher ([#41](https://github.com/christianhelle/chlogr/pull/41)) ([@christianhelle](https://github.com/christianhelle/))
 - feat: show per-fetcher progress in parallel mode ([#36](https://github.com/christianhelle/chlogr/pull/36)) ([@christianhelle](https://github.com/christianhelle/))
 - feat: wire --parallel flag into main.zig fetch path ([#35](https://github.com/christianhelle/chlogr/pull/35)) ([@christianhelle](https://github.com/christianhelle/))
 - feat: implement ParallelFetcher with std.Thread ([#34](https://github.com/christianhelle/chlogr/pull/34)) ([@christianhelle](https://github.com/christianhelle/))
 - feat: add progress messages during sequential fetch ([#33](https://github.com/christianhelle/chlogr/pull/33)) ([@christianhelle](https://github.com/christianhelle/))
 - feat: add --parallel flag to CLI argument parsing ([#32](https://github.com/christianhelle/chlogr/pull/32)) ([@christianhelle](https://github.com/christianhelle/))
 - feat: add link to non-bot pr authors in output changelog ([#39](https://github.com/christianhelle/chlogr/pull/39)) ([@christianhelle](https://github.com/christianhelle/))
+
+### Bug Fixes
+- fix: support arbitrary degree of parallelism in parallel PR fetcher ([#41](https://github.com/christianhelle/chlogr/pull/41)) ([@christianhelle](https://github.com/christianhelle/))
 
 ### Closed Issues
 - feat: show per-fetcher progress and completion in parallel mode ([#31](https://github.com/christianhelle/chlogr/issues/31)) ([@christianhelle](https://github.com/christianhelle/))
@@ -36,15 +38,17 @@
 - chore: add copilot instructions for agent workflow ([#15](https://github.com/christianhelle/chlogr/pull/15)) ([@christianhelle](https://github.com/christianhelle/))
 
 ### Features
-- fix: add errdefer cleanup to GitHub API deep-copy allocation paths (#6) ([#20](https://github.com/christianhelle/chlogr/pull/20)) ([@christianhelle](https://github.com/christianhelle/))
 - feat: sort the changelog by newest-first ([#25](https://github.com/christianhelle/chlogr/pull/25)) ([@christianhelle](https://github.com/christianhelle/))
-- fix: hardcoded version in help text ([#26](https://github.com/christianhelle/chlogr/pull/26)) ([@christianhelle](https://github.com/christianhelle/))
 - perf: reduce allocation churn in generator and formatter ([#24](https://github.com/christianhelle/chlogr/pull/24)) ([@christianhelle](https://github.com/christianhelle/))
+- feat: implement pagination for releases and merged pull requests (#7) ([#21](https://github.com/christianhelle/chlogr/pull/21)) ([@christianhelle](https://github.com/christianhelle/))
+- feat: implement --since-tag and --until-tag filtering (#8) ([#18](https://github.com/christianhelle/chlogr/pull/18)) ([@christianhelle](https://github.com/christianhelle/))
+
+### Bug Fixes
+- fix: hardcoded version in help text ([#26](https://github.com/christianhelle/chlogr/pull/26)) ([@christianhelle](https://github.com/christianhelle/))
 - fix: use --repo slug in generated markdown links ([#23](https://github.com/christianhelle/chlogr/pull/23)) ([@christianhelle](https://github.com/christianhelle/))
 - fix: exact CSV token matching for --exclude-labels ([#22](https://github.com/christianhelle/chlogr/pull/22)) ([@christianhelle](https://github.com/christianhelle/))
-- feat: implement pagination for releases and merged pull requests (#7) ([#21](https://github.com/christianhelle/chlogr/pull/21)) ([@christianhelle](https://github.com/christianhelle/))
+- fix: add errdefer cleanup to GitHub API deep-copy allocation paths (#6) ([#20](https://github.com/christianhelle/chlogr/pull/20)) ([@christianhelle](https://github.com/christianhelle/))
 - fix: assign each PR to exactly one release using full timestamp comparison (#5) ([#19](https://github.com/christianhelle/chlogr/pull/19)) ([@christianhelle](https://github.com/christianhelle/))
-- feat: implement --since-tag and --until-tag filtering (#8) ([#18](https://github.com/christianhelle/chlogr/pull/18)) ([@christianhelle](https://github.com/christianhelle/))
 - fix: safe section-map initialization and propagate allocation failures (#3) ([#17](https://github.com/christianhelle/chlogr/pull/17)) ([@christianhelle](https://github.com/christianhelle/))
 - fix: harden gh token resolution against panics and stderr deadlock (#4) ([#16](https://github.com/christianhelle/chlogr/pull/16)) ([@christianhelle](https://github.com/christianhelle/))
 
