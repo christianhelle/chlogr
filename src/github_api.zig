@@ -198,10 +198,10 @@ const WorkerPageState = struct {
     total_pages: u32,
     next_page: u32 = 2,
     err: ?anyerror = null,
-    mutex: std.Io.Mutex = .init,
+    mutex: std.atomic.Mutex = .unlocked,
 
     fn claimNextPage(self: *WorkerPageState) ?u32 {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) std.Thread.yield() catch {};
         defer self.mutex.unlock();
 
         if (self.err != null) return null;
@@ -213,7 +213,7 @@ const WorkerPageState = struct {
     }
 
     fn setError(self: *WorkerPageState, err: anyerror) void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) std.Thread.yield() catch {};
         defer self.mutex.unlock();
 
         if (self.err == null) {

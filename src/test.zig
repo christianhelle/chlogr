@@ -329,7 +329,7 @@ fn testMarkdownFormatterWithUnreleased() !void {
     const changelog = try gen.generate(releases, prs);
     defer gen.deinitChangelog(changelog);
 
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, "testowner/testrepo");
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, std.Io.Threaded.global_single_threaded.io(), "testowner/testrepo");
     const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
     defer formatter.deinit(markdown);
 
@@ -416,7 +416,7 @@ fn testMarkdownFormatterWithoutUnreleased() !void {
     const changelog = try gen.generate(releases, prs);
     defer gen.deinitChangelog(changelog);
 
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, "testowner/testrepo");
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, std.Io.Threaded.global_single_threaded.io(), "testowner/testrepo");
     const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
     defer formatter.deinit(markdown);
 
@@ -492,7 +492,7 @@ fn testMarkdownFormatterIncludesClosedIssuesSection() !void {
     const changelog = try gen.generateWithIssues(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, "testowner/testrepo");
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, std.Io.Threaded.global_single_threaded.io(), "testowner/testrepo");
     const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
     defer formatter.deinit(markdown);
 
@@ -620,7 +620,7 @@ fn testLegacyFormatMethod() !void {
     const changelog = try gen.generate(releases, prs);
     defer gen.deinitChangelog(changelog);
 
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, "testowner/testrepo");
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, std.Io.Threaded.global_single_threaded.io(), "testowner/testrepo");
     const markdown = try formatter.format(changelog.releases);
     defer formatter.deinit(markdown);
 
@@ -971,7 +971,7 @@ fn testRepoSlugInReleaseLinks() !void {
     defer gen.deinitChangelog(changelog);
 
     const repo_slug = "myorg/myrepo";
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, repo_slug);
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, std.Io.Threaded.global_single_threaded.io(), repo_slug);
     const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
     defer formatter.deinit(markdown);
 
@@ -1153,7 +1153,7 @@ pub fn main() !void {
     }
 
     std.debug.print("\nFormatting to Markdown...\n", .{});
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, "testowner/testrepo");
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, std.Io.Threaded.global_single_threaded.io(), "testowner/testrepo");
     const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
     defer formatter.deinit(markdown);
 

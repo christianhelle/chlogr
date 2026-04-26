@@ -58,7 +58,7 @@ description: |
 
   ## Technical Details
 
-  - Built with Zig 0.15+ for native performance
+  - Built with Zig 0.16+ for native performance
   - Zero external dependencies - Zig stdlib only
   - Single portable executable
   - Cross-platform (Linux, macOS, Windows)
@@ -77,7 +77,7 @@ description: |
 
   - GitHub account (for private repos or higher rate limits)
   - GitHub API token (optional but recommended)
-  - Zig 0.15+ for building from source
+  - Zig 0.16+ for building from source
 
   ## Links
 

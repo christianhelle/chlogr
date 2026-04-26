@@ -17,11 +17,13 @@ fn isAuthorBot(entry: changelog_generator.ChangelogEntry) bool {
 
 pub const MarkdownFormatter = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     repo: []const u8,
 
-    pub fn init(allocator: std.mem.Allocator, repo: []const u8) MarkdownFormatter {
+    pub fn init(allocator: std.mem.Allocator, io: std.Io, repo: []const u8) MarkdownFormatter {
         return MarkdownFormatter{
             .allocator = allocator,
+            .io = io,
             .repo = repo,
         };
     }
@@ -74,9 +76,9 @@ pub const MarkdownFormatter = struct {
             est += NEWLINE_LEN;
         }
 
-        var buf = try std.ArrayList(u8).initCapacity(self.allocator, est);
-        errdefer buf.deinit(self.allocator);
-        const writer = buf.writer(self.allocator);
+        var buf = try std.Io.Writer.Allocating.initCapacity(self.allocator, est);
+        errdefer buf.deinit();
+        const writer = &buf.writer;
 
         try writer.writeAll("# Changelog\n\n");
 
@@ -123,15 +125,15 @@ pub const MarkdownFormatter = struct {
             try writer.writeByte('\n');
         }
 
-        return buf.toOwnedSlice(self.allocator);
+        return buf.toOwnedSlice();
     }
 
     /// Write Markdown to file
-    pub fn writeToFile(_: MarkdownFormatter, file_path: []const u8, content: []const u8) !void {
-        const file = try std.fs.cwd().createFile(file_path, .{});
-        defer file.close();
+    pub fn writeToFile(self: MarkdownFormatter, file_path: []const u8, content: []const u8) !void {
+        const file = try std.Io.Dir.cwd().createFile(self.io, file_path, .{});
+        defer file.close(self.io);
 
-        try file.writeAll(content);
+        try file.writeStreamingAll(self.io, content);
     }
 
     pub fn deinit(self: MarkdownFormatter, content: []u8) void {

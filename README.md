@@ -17,7 +17,7 @@ A fast, efficient, native CLI tool to automatically generate changelogs from Git
 
 ## Building
 
-Requirements: Zig 0.15+
+Requirements: Zig 0.16+
 
 ```bash
 zig build

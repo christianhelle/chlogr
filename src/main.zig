@@ -149,6 +149,7 @@ pub fn main(init: std.process.Init) !void {
 
     var formatter = markdown_formatter.MarkdownFormatter.init(
         allocator,
+        init.io,
         parsed_args.repo.?,
     );
     const markdown = try formatter.formatWithUnreleased(
