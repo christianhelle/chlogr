@@ -198,11 +198,11 @@ const WorkerPageState = struct {
     total_pages: u32,
     next_page: u32 = 2,
     err: ?anyerror = null,
-    mutex: std.atomic.Mutex = .unlocked,
+    mutex: std.Io.Mutex = .init,
 
-    fn claimNextPage(self: *WorkerPageState) ?u32 {
-        while (!self.mutex.tryLock()) std.Thread.yield() catch {};
-        defer self.mutex.unlock();
+    fn claimNextPage(self: *WorkerPageState, io: std.Io) ?u32 {
+        self.mutex.lock(io) catch return null;
+        defer self.mutex.unlock(io);
 
         if (self.err != null) return null;
         if (self.next_page > self.total_pages) return null;
@@ -212,9 +212,9 @@ const WorkerPageState = struct {
         return page;
     }
 
-    fn setError(self: *WorkerPageState, err: anyerror) void {
-        while (!self.mutex.tryLock()) std.Thread.yield() catch {};
-        defer self.mutex.unlock();
+    fn setError(self: *WorkerPageState, io: std.Io, err: anyerror) void {
+        self.mutex.lock(io) catch return;
+        defer self.mutex.unlock(io);
 
         if (self.err == null) {
             self.err = err;
@@ -1182,9 +1182,9 @@ fn releasesPaginationWorkerFn(ctx: ReleasesPaginationWorkerCtx) void {
     defer client.deinit();
 
     while (true) {
-        const page = ctx.state.claimNextPage() orelse return;
+        const page = ctx.state.claimNextPage(ctx.io) orelse return;
         const page_result = client.fetchReleasePage(page) catch |err| {
-            ctx.state.setError(err);
+            ctx.state.setError(ctx.io, err);
             return;
         };
 
@@ -1198,9 +1198,9 @@ fn pullRequestsPaginationWorkerFn(ctx: PullRequestsPaginationWorkerCtx) void {
     defer client.deinit();
 
     while (true) {
-        const page = ctx.state.claimNextPage() orelse return;
+        const page = ctx.state.claimNextPage(ctx.io) orelse return;
         const page_result = client.fetchPullRequestPage(page) catch |err| {
-            ctx.state.setError(err);
+            ctx.state.setError(ctx.io, err);
             return;
         };
 
@@ -1214,9 +1214,9 @@ fn issuesPaginationWorkerFn(ctx: IssuesPaginationWorkerCtx) void {
     defer client.deinit();
 
     while (true) {
-        const page = ctx.state.claimNextPage() orelse return;
+        const page = ctx.state.claimNextPage(ctx.io) orelse return;
         const page_result = client.fetchIssuePage(page) catch |err| {
-            ctx.state.setError(err);
+            ctx.state.setError(ctx.io, err);
             return;
         };
 
