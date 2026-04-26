@@ -15,14 +15,16 @@ pub const HttpResponse = struct {
 
 pub const HttpClient = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     client: std.http.Client,
     token: []const u8,
     base_url: []const u8 = "https://api.github.com",
 
-    pub fn init(allocator: std.mem.Allocator, token: []const u8) HttpClient {
+    pub fn init(allocator: std.mem.Allocator, io: std.Io, token: []const u8) HttpClient {
         return HttpClient{
             .allocator = allocator,
-            .client = std.http.Client{ .allocator = allocator },
+            .io = io,
+            .client = std.http.Client{ .allocator = allocator, .io = io },
             .token = token,
         };
     }

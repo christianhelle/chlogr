@@ -6,13 +6,10 @@ const token_resolver = @import("token_resolver.zig");
 const markdown_formatter = @import("markdown_formatter.zig");
 const changelog_generator = @import("changelog_generator.zig");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const args = try init.minimal.args.toSlice(init.arena.allocator());
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
 
     const cli_parser = cli.CliParser.init(allocator);
     const parsed_args = cli_parser.parse(args) catch |err| {
@@ -32,7 +29,7 @@ pub fn main() !void {
         return;
     }
 
-    const resolver = token_resolver.TokenResolver.init(allocator);
+    const resolver = token_resolver.TokenResolver.init(allocator, init.minimal.environ, init.io);
     const resolved_token = try resolver.resolve(parsed_args.token);
     defer resolver.deinit(resolved_token);
 
@@ -48,6 +45,7 @@ pub fn main() !void {
 
     var api_client = github_api.GitHubApiClient.init(
         allocator,
+        init.io,
         resolved_token.value,
         parsed_args.repo.?,
     );
@@ -63,6 +61,7 @@ pub fn main() !void {
         std.debug.print("\nFetching data...\n", .{});
         var fetcher = github_api.ParallelFetcher.init(
             allocator,
+            init.io,
             resolved_token.value,
             parsed_args.repo.?,
             parsed_args.degree_of_parallelism,

@@ -65,7 +65,7 @@ fn changelogContainsEntry(
 }
 
 fn testBasicChangelogGeneration() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -100,7 +100,7 @@ fn testBasicChangelogGeneration() !void {
 }
 
 fn testUnreleasedChangesOnly() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -135,7 +135,7 @@ fn testUnreleasedChangesOnly() !void {
 }
 
 fn testNoUnreleasedChanges() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -166,7 +166,7 @@ fn testNoUnreleasedChanges() !void {
 }
 
 fn testExcludeLabels() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -210,7 +210,7 @@ fn testExcludeLabels() !void {
 }
 
 fn testNoMergedAt() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -241,7 +241,7 @@ fn testNoMergedAt() !void {
 }
 
 fn testEmptyReleases() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -272,7 +272,7 @@ fn testEmptyReleases() !void {
 }
 
 fn testEmptyPullRequests() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -303,7 +303,7 @@ fn testEmptyPullRequests() !void {
 }
 
 fn testMarkdownFormatterWithUnreleased() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -339,7 +339,7 @@ fn testMarkdownFormatterWithUnreleased() !void {
 }
 
 fn testExcludeLabelsAlsoAppliesToClosedIssues() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -390,7 +390,7 @@ fn testExcludeLabelsAlsoAppliesToClosedIssues() !void {
 }
 
 fn testMarkdownFormatterWithoutUnreleased() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -424,7 +424,7 @@ fn testMarkdownFormatterWithoutUnreleased() !void {
 }
 
 fn testClosedIssuesGroupedByRelease() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -462,7 +462,7 @@ fn testClosedIssuesGroupedByRelease() !void {
 }
 
 fn testMarkdownFormatterIncludesClosedIssuesSection() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -503,7 +503,7 @@ fn testMarkdownFormatterIncludesClosedIssuesSection() !void {
 }
 
 fn testClosedIssuesExcludePullRequestEntries() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -530,7 +530,7 @@ fn testClosedIssuesExcludePullRequestEntries() !void {
 }
 
 fn testCategorization() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -594,7 +594,7 @@ fn testCategorization() !void {
 }
 
 fn testLegacyFormatMethod() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -630,7 +630,7 @@ fn testLegacyFormatMethod() !void {
 // Regression: a PR whose merged_at equals the release's published_at must appear in
 // that release (boundary is inclusive), not in unreleased.
 fn testSameDayMergeHandling() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -671,7 +671,7 @@ fn testSameDayMergeHandling() !void {
 }
 
 fn testSinceTagFilter() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -707,7 +707,7 @@ fn testSinceTagFilter() !void {
 // Regression: a PR that qualifies for multiple releases must appear in exactly one
 // (the earliest qualifying release), never duplicated.
 fn testNoDuplicateAssignment() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -746,7 +746,7 @@ fn testNoDuplicateAssignment() !void {
 }
 
 fn testUntilTagFilter() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -780,7 +780,7 @@ fn testUntilTagFilter() !void {
 }
 
 fn testBothTagsFilter() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -815,7 +815,7 @@ fn testBothTagsFilter() !void {
 }
 
 fn testExcludeLabelsExactMatch() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -863,7 +863,7 @@ fn testExcludeLabelsExactMatch() !void {
 }
 
 fn testExcludeLabelsCSV() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -908,7 +908,7 @@ fn testExcludeLabelsCSV() !void {
 }
 
 fn testTagNotFound() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -944,7 +944,7 @@ fn testTagNotFound() !void {
 }
 
 fn testRepoSlugInReleaseLinks() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -1082,7 +1082,7 @@ pub fn main() !void {
 
     std.debug.print("\n=== Integration Test with Output ===\n\n", .{});
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

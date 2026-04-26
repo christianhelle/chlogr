@@ -198,7 +198,7 @@ const WorkerPageState = struct {
     total_pages: u32,
     next_page: u32 = 2,
     err: ?anyerror = null,
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.Io.Mutex = .init,
 
     fn claimNextPage(self: *WorkerPageState) ?u32 {
         self.mutex.lock();
@@ -434,13 +434,15 @@ fn PageResult(comptime T: type) type {
 
 pub const GitHubApiClient = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     http_client: http_client.HttpClient,
     repo: []const u8,
 
-    pub fn init(allocator: std.mem.Allocator, token: []const u8, repo: []const u8) GitHubApiClient {
+    pub fn init(allocator: std.mem.Allocator, io: std.Io, token: []const u8, repo: []const u8) GitHubApiClient {
         return GitHubApiClient{
             .allocator = allocator,
-            .http_client = http_client.HttpClient.init(allocator, token),
+            .io = io,
+            .http_client = http_client.HttpClient.init(allocator, io, token),
             .repo = repo,
         };
     }
@@ -873,6 +875,7 @@ pub const GitHubApiClient = struct {
         while (worker_index < worker_count_usize) : (worker_index += 1) {
             const ctx = ReleasesPaginationWorkerCtx{
                 .allocator = self.allocator,
+                .io = self.io,
                 .token = self.http_client.token,
                 .repo = self.repo,
                 .state = &state,
@@ -944,6 +947,7 @@ pub const GitHubApiClient = struct {
         while (worker_index < worker_count_usize) : (worker_index += 1) {
             const ctx = PullRequestsPaginationWorkerCtx{
                 .allocator = self.allocator,
+                .io = self.io,
                 .token = self.http_client.token,
                 .repo = self.repo,
                 .state = &state,
@@ -1015,6 +1019,7 @@ pub const GitHubApiClient = struct {
         while (worker_index < worker_count_usize) : (worker_index += 1) {
             const ctx = IssuesPaginationWorkerCtx{
                 .allocator = self.allocator,
+                .io = self.io,
                 .token = self.http_client.token,
                 .repo = self.repo,
                 .state = &state,
@@ -1090,6 +1095,7 @@ pub const ParallelFetchResults = struct {
 /// Context passed to each thread
 const ReleasesThreadCtx = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     token: []const u8,
     repo: []const u8,
     degree_of_parallelism: u32,
@@ -1098,6 +1104,7 @@ const ReleasesThreadCtx = struct {
 
 const PrsThreadCtx = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     token: []const u8,
     repo: []const u8,
     degree_of_parallelism: u32,
@@ -1106,6 +1113,7 @@ const PrsThreadCtx = struct {
 
 const IssuesThreadCtx = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     token: []const u8,
     repo: []const u8,
     degree_of_parallelism: u32,
@@ -1114,6 +1122,7 @@ const IssuesThreadCtx = struct {
 
 const ReleasesPaginationWorkerCtx = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     token: []const u8,
     repo: []const u8,
     state: *WorkerPageState,
@@ -1122,6 +1131,7 @@ const ReleasesPaginationWorkerCtx = struct {
 
 const PullRequestsPaginationWorkerCtx = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     token: []const u8,
     repo: []const u8,
     state: *WorkerPageState,
@@ -1130,6 +1140,7 @@ const PullRequestsPaginationWorkerCtx = struct {
 
 const IssuesPaginationWorkerCtx = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     token: []const u8,
     repo: []const u8,
     state: *WorkerPageState,
@@ -1137,7 +1148,7 @@ const IssuesPaginationWorkerCtx = struct {
 };
 
 fn releasesThreadFn(ctx: ReleasesThreadCtx) void {
-    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    var client = GitHubApiClient.init(ctx.allocator, ctx.io, ctx.token, ctx.repo);
     defer client.deinit();
     ctx.results.releases = client.getAllReleases(ctx.degree_of_parallelism) catch |err| {
         ctx.results.releases_err = err;
@@ -1147,7 +1158,7 @@ fn releasesThreadFn(ctx: ReleasesThreadCtx) void {
 }
 
 fn prsThreadFn(ctx: PrsThreadCtx) void {
-    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    var client = GitHubApiClient.init(ctx.allocator, ctx.io, ctx.token, ctx.repo);
     defer client.deinit();
     ctx.results.prs = client.getAllPullRequests(ctx.degree_of_parallelism) catch |err| {
         ctx.results.prs_err = err;
@@ -1157,7 +1168,7 @@ fn prsThreadFn(ctx: PrsThreadCtx) void {
 }
 
 fn issuesThreadFn(ctx: IssuesThreadCtx) void {
-    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    var client = GitHubApiClient.init(ctx.allocator, ctx.io, ctx.token, ctx.repo);
     defer client.deinit();
     ctx.results.issues = client.getAllClosedIssues(ctx.degree_of_parallelism) catch |err| {
         ctx.results.issues_err = err;
@@ -1167,7 +1178,7 @@ fn issuesThreadFn(ctx: IssuesThreadCtx) void {
 }
 
 fn releasesPaginationWorkerFn(ctx: ReleasesPaginationWorkerCtx) void {
-    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    var client = GitHubApiClient.init(ctx.allocator, ctx.io, ctx.token, ctx.repo);
     defer client.deinit();
 
     while (true) {
@@ -1183,7 +1194,7 @@ fn releasesPaginationWorkerFn(ctx: ReleasesPaginationWorkerCtx) void {
 }
 
 fn pullRequestsPaginationWorkerFn(ctx: PullRequestsPaginationWorkerCtx) void {
-    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    var client = GitHubApiClient.init(ctx.allocator, ctx.io, ctx.token, ctx.repo);
     defer client.deinit();
 
     while (true) {
@@ -1199,7 +1210,7 @@ fn pullRequestsPaginationWorkerFn(ctx: PullRequestsPaginationWorkerCtx) void {
 }
 
 fn issuesPaginationWorkerFn(ctx: IssuesPaginationWorkerCtx) void {
-    var client = GitHubApiClient.init(ctx.allocator, ctx.token, ctx.repo);
+    var client = GitHubApiClient.init(ctx.allocator, ctx.io, ctx.token, ctx.repo);
     defer client.deinit();
 
     while (true) {
@@ -1216,18 +1227,21 @@ fn issuesPaginationWorkerFn(ctx: IssuesPaginationWorkerCtx) void {
 
 pub const ParallelFetcher = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     token: []const u8,
     repo: []const u8,
     degree_of_parallelism: u32,
 
     pub fn init(
         allocator: std.mem.Allocator,
+        io: std.Io,
         token: []const u8,
         repo: []const u8,
         degree_of_parallelism: u32,
     ) ParallelFetcher {
         return .{
             .allocator = allocator,
+            .io = io,
             .token = token,
             .repo = repo,
             .degree_of_parallelism = degree_of_parallelism,
@@ -1241,6 +1255,7 @@ pub const ParallelFetcher = struct {
 
         const releases_ctx = ReleasesThreadCtx{
             .allocator = self.allocator,
+            .io = self.io,
             .token = self.token,
             .repo = self.repo,
             .degree_of_parallelism = self.degree_of_parallelism,
@@ -1248,6 +1263,7 @@ pub const ParallelFetcher = struct {
         };
         const prs_ctx = PrsThreadCtx{
             .allocator = self.allocator,
+            .io = self.io,
             .token = self.token,
             .repo = self.repo,
             .degree_of_parallelism = self.degree_of_parallelism,
@@ -1255,6 +1271,7 @@ pub const ParallelFetcher = struct {
         };
         const issues_ctx = IssuesThreadCtx{
             .allocator = self.allocator,
+            .io = self.io,
             .token = self.token,
             .repo = self.repo,
             .degree_of_parallelism = self.degree_of_parallelism,
