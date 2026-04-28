@@ -8,10 +8,14 @@ pub const ResolvedToken = struct {
 
 pub const TokenResolver = struct {
     allocator: std.mem.Allocator,
+    environ: std.process.Environ,
+    io: std.Io,
 
-    pub fn init(allocator: std.mem.Allocator) TokenResolver {
+    pub fn init(allocator: std.mem.Allocator, environ: std.process.Environ, io: std.Io) TokenResolver {
         return TokenResolver{
             .allocator = allocator,
+            .environ = environ,
+            .io = io,
         };
     }
 
@@ -34,7 +38,7 @@ pub const TokenResolver = struct {
         }
 
         // 2. Check GITHUB_TOKEN env var (owned - must free)
-        if (std.process.getEnvVarOwned(self.allocator, "GITHUB_TOKEN")) |token| {
+        if (std.process.Environ.getAlloc(self.environ, self.allocator, "GITHUB_TOKEN")) |token| {
             if (token.len > 0) {
                 std.debug.print("Using GITHUB_TOKEN from environment variable\n", .{});
                 return ResolvedToken{
@@ -46,11 +50,11 @@ pub const TokenResolver = struct {
                 self.allocator.free(token);
             }
         } else |err| {
-            if (err != error.EnvironmentVariableNotFound) return err;
+            if (err != error.EnvironmentVariableMissing) return err;
         }
 
         // 3. Check GH_TOKEN env var (owned - must free)
-        if (std.process.getEnvVarOwned(self.allocator, "GH_TOKEN")) |token| {
+        if (std.process.Environ.getAlloc(self.environ, self.allocator, "GH_TOKEN")) |token| {
             if (token.len > 0) {
                 std.debug.print("Using GH_TOKEN from environment variable\n", .{});
                 return ResolvedToken{
@@ -62,7 +66,7 @@ pub const TokenResolver = struct {
                 self.allocator.free(token);
             }
         } else |err| {
-            if (err != error.EnvironmentVariableNotFound) return err;
+            if (err != error.EnvironmentVariableMissing) return err;
         }
 
         // 4. Try to get token from gh CLI (owned - must free)
@@ -88,29 +92,18 @@ pub const TokenResolver = struct {
 
     /// Attempt to get token from GitHub CLI command 'gh auth token'
     fn getTokenFromGhCli(self: TokenResolver) ![]const u8 {
-        var child = std.process.Child.init(&[_][]const u8{ "gh", "auth", "token" }, self.allocator);
+        const result = try std.process.run(self.allocator, self.io, .{
+            .argv = &.{ "gh", "auth", "token" },
+        });
+        defer self.allocator.free(result.stdout);
+        defer self.allocator.free(result.stderr);
 
-        child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Ignore;
-
-        try child.spawn();
-        defer {
-            _ = child.kill() catch {};
-        }
-
-        var stdout_buf: [1024]u8 = undefined;
-        const bytes_read = try child.stdout.?.readAll(&stdout_buf);
-        const stdout = stdout_buf[0..bytes_read];
-
-        const term = try child.wait();
-
-        switch (term) {
-            .Exited => |code| if (code != 0) return error.GhCliExited,
+        switch (result.term) {
+            .exited => |code| if (code != 0) return error.GhCliExited,
             else => return error.GhCliExited,
         }
 
-        // Trim whitespace from output
-        const token = std.mem.trim(u8, stdout, " \t\n\r");
+        const token = std.mem.trim(u8, result.stdout, " \t\n\r");
         if (token.len == 0) {
             return error.EmptyToken;
         }
