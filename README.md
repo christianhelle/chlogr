@@ -15,6 +15,22 @@ A fast, efficient, native CLI tool to automatically generate changelogs from Git
 - Optional parallel fetching (`--parallel <N>`) — fetches releases, PRs, and closed issues concurrently; release and PR pagination use bounded page concurrency
 - Fully functional core logic verified with integration tests
 
+## Installation
+
+### macOS / Linux
+
+```bash
+curl -fsSL https://christianhelle.com/chlogr/install | bash
+```
+
+### Windows (PowerShell)
+
+```powershell
+irm https://christianhelle.com/chlogr/install.ps1 | iex
+```
+
+The install scripts download the latest release binary from GitHub Releases. The bash script installs to `~/.local/bin` (override with the `INSTALL_DIR` environment variable), and the PowerShell script installs to `%USERPROFILE%\.local\bin`. Verify the installation with `chlogr --help`.
+
 ## Building
 
 Requirements: Zig 0.16+
