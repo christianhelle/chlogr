@@ -2,8 +2,12 @@
 
 ## [Unreleased Changes]
 
+### Merged Pull Requests
+- docs: document installation via hosted install scripts ([#46](https://github.com/christianhelle/chlogr/pull/46)) ([@christianhelle](https://github.com/christianhelle/))
+- Remove Squad ([#45](https://github.com/christianhelle/chlogr/pull/45)) ([@christianhelle](https://github.com/christianhelle/))
+
 ### Features
-- Upgrade chlogr to Zig 0.16 ([#44](https://github.com/christianhelle/chlogr/pull/44)) (@Copilot)
+- Upgrade to Zig version 0.16 ([#44](https://github.com/christianhelle/chlogr/pull/44)) (@Copilot)
 - Include closed issues in changelog ([#43](https://github.com/christianhelle/chlogr/pull/43)) ([@christianhelle](https://github.com/christianhelle/))
 
 
