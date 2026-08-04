@@ -29,6 +29,8 @@ curl -fsSL https://christianhelle.com/chlogr/install | bash
 irm https://christianhelle.com/chlogr/install.ps1 | iex
 ```
 
+The install scripts download the latest release binary from GitHub Releases. The bash script installs to `~/.local/bin` (override with the `INSTALL_DIR` environment variable), and the PowerShell script installs to `%USERPROFILE%\.local\bin`. Verify the installation with `chlogr --help`.
+
 ## Building
 
 Requirements: Zig 0.16+
