@@ -7,6 +7,7 @@
 - Remove Squad ([#45](https://github.com/christianhelle/chlogr/pull/45)) ([@christianhelle](https://github.com/christianhelle/))
 
 ### Features
+- Fix incorrect version shown when running ([#47](https://github.com/christianhelle/chlogr/pull/47)) ([@christianhelle](https://github.com/christianhelle/))
 - Upgrade to Zig version 0.16 ([#44](https://github.com/christianhelle/chlogr/pull/44)) (@Copilot)
 - Include closed issues in changelog ([#43](https://github.com/christianhelle/chlogr/pull/43)) ([@christianhelle](https://github.com/christianhelle/))
 
