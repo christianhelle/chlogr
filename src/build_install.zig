@@ -16,20 +16,21 @@ pub fn resolveInstallDir(
     environ: *const std.process.Environ.Map,
     os_tag: std.Target.Os.Tag,
 ) []const u8 {
-    _ = os_tag;
     if (!std.mem.eql(u8, install_prefix, default_prefix)) {
-        return allocator.dupe(u8, install_prefix) catch @panic("OOM");
+        return std.fs.path.join(allocator, &.{ install_prefix, "bin" }) catch @panic("OOM");
     }
 
     if (environ.get("INSTALL_DIR")) |install_dir| {
-        if (install_dir.len > 0) return install_dir;
+        if (install_dir.len > 0) return allocator.dupe(u8, install_dir) catch @panic("OOM");
     }
 
-    if (environ.get("HOME")) |home| {
-        if (home.len > 0) return std.fs.path.join(allocator, &.{ home, ".local", "bin" }) catch @panic("OOM");
-    }
-    if (environ.get("USERPROFILE")) |home| {
-        if (home.len > 0) return std.fs.path.join(allocator, &.{ home, ".local", "bin" }) catch @panic("OOM");
+    const primary = if (os_tag == .windows) "USERPROFILE" else "HOME";
+    const fallback = if (os_tag == .windows) "HOME" else "USERPROFILE";
+    const home_vars = [_][]const u8{ primary, fallback };
+    for (home_vars) |home_var| {
+        if (environ.get(home_var)) |home| {
+            if (home.len > 0) return std.fs.path.join(allocator, &.{ home, ".local", "bin" }) catch @panic("OOM");
+        }
     }
 
     @panic("unable to determine install directory: set HOME, USERPROFILE, or INSTALL_DIR");
