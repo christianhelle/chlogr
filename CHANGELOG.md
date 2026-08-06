@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased Changes]
+## [0.3.7](https://github.com/christianhelle/chlogr/releases/tag/0.3.7) (2026-08-06)
 
 ### Merged Pull Requests
 - docs: document installation via hosted install scripts ([#46](https://github.com/christianhelle/chlogr/pull/46)) ([@christianhelle](https://github.com/christianhelle/))
