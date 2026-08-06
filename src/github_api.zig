@@ -487,11 +487,7 @@ pub const GitHubApiClient = struct {
 
     fn getAllReleases(self: *GitHubApiClient, degree_of_parallelism: u32) ![]models.Release {
         const first_page = try self.fetchReleasePage(1);
-        const plan = buildPaginationPlan(
-            first_page.pagination,
-            first_page.items.len,
-            degree_of_parallelism,
-        );
+        const plan = buildPlanForPage(first_page, degree_of_parallelism);
 
         return switch (plan.strategy) {
             .single_page => first_page.items,
@@ -510,11 +506,7 @@ pub const GitHubApiClient = struct {
 
     fn getAllPullRequests(self: *GitHubApiClient, degree_of_parallelism: u32) ![]models.PullRequest {
         const first_page = try self.fetchPullRequestPage(1);
-        const plan = buildPaginationPlan(
-            first_page.pagination,
-            first_page.items.len,
-            degree_of_parallelism,
-        );
+        const plan = buildPlanForPage(first_page, degree_of_parallelism);
 
         return switch (plan.strategy) {
             .single_page => first_page.items,
@@ -533,11 +525,7 @@ pub const GitHubApiClient = struct {
 
     fn getAllClosedIssues(self: *GitHubApiClient, degree_of_parallelism: u32) ![]models.Issue {
         const first_page = try self.fetchIssuePage(1);
-        const plan = buildPaginationPlan(
-            first_page.pagination,
-            first_page.items.len,
-            degree_of_parallelism,
-        );
+        const plan = buildPlanForPage(first_page, degree_of_parallelism);
 
         return switch (plan.strategy) {
             .single_page => first_page.items,
