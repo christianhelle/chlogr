@@ -72,3 +72,41 @@ fn getInstallPrefix(b: *std.Build) []const u8 {
 
     @panic("unable to determine install directory: set HOME, USERPROFILE, or INSTALL_DIR");
 }
+
+const InstallReleaseStep = struct {
+    step: std.Build.Step,
+    source: std.Build.LazyPath,
+    dest_dir: []const u8,
+    dest_name: []const u8,
+
+    fn create(
+        b: *std.Build,
+        source: std.Build.LazyPath,
+        dest_dir: []const u8,
+        dest_name: []const u8,
+    ) *InstallReleaseStep {
+        const self = b.allocator.create(InstallReleaseStep) catch @panic("OOM");
+        self.* = .{
+            .step = std.Build.Step.init(.{
+                .id = .custom,
+                .name = b.fmt("install {s} to {s}", .{ dest_name, dest_dir }),
+                .owner = b,
+                .makeFn = make,
+            }),
+            .source = source.dupe(b),
+            .dest_dir = b.dupePath(dest_dir),
+            .dest_name = b.dupePath(dest_name),
+        };
+        source.addStepDependencies(&self.step);
+        return self;
+    }
+
+    fn make(step: *std.Build.Step, options: std.Build.Step.MakeOptions) anyerror!void {
+        _ = options;
+        const b = step.owner;
+        const self: *InstallReleaseStep = @fieldParentPtr("step", step);
+        const dest_path = b.pathResolve(&.{ self.dest_dir, self.dest_name });
+        const p = try step.installFile(self.source, dest_path);
+        step.result_cached = p == .fresh;
+    }
+};
