@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased Changes]
+
+### Features
+- Add zig build install-release step ([#49](https://github.com/christianhelle/chlogr/pull/49)) ([@christianhelle](https://github.com/christianhelle/))
+
+
 ## [0.3.7](https://github.com/christianhelle/chlogr/releases/tag/0.3.7) (2026-08-06)
 
 ### Merged Pull Requests
