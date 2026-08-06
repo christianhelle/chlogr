@@ -63,12 +63,12 @@ pub const ChangelogGenerator = struct {
 
         for (releases, 0..) |release, i| {
             if (want_since and since_idx == null) {
-                if (std.mem.eql(u8, release.tag_name, self.since_tag.?)) {
+                if (std.mem.eql(u8, release.tag_name.?, self.since_tag.?)) {
                     since_idx = i;
                 }
             }
             if (want_until and until_idx == null) {
-                if (std.mem.eql(u8, release.tag_name, self.until_tag.?)) {
+                if (std.mem.eql(u8, release.tag_name.?, self.until_tag.?)) {
                     until_idx = i;
                 }
             }
@@ -133,7 +133,7 @@ pub const ChangelogGenerator = struct {
     }
 
     fn releaseOldestFirst(_: void, a: models.Release, b: models.Release) bool {
-        return std.mem.lessThan(u8, a.published_at, b.published_at);
+        return std.mem.lessThan(u8, a.published_at.?, b.published_at.?);
     }
 
     fn appendSectionEntry(
@@ -247,7 +247,7 @@ pub const ChangelogGenerator = struct {
                 if (assigned_prs[i]) continue;
                 if (self.shouldExclude(pr.labels)) continue;
                 const merged_at = pr.merged_at orelse continue;
-                if (std.mem.order(u8, merged_at, release.published_at) == .gt) continue;
+                if (std.mem.order(u8, merged_at, release.published_at.?) == .gt) continue;
 
                 assigned_prs[i] = true;
                 try self.appendSectionEntry(&sections_map, self.categorizeEntry(pr.labels), .{
@@ -262,7 +262,7 @@ pub const ChangelogGenerator = struct {
                 if (assigned_issues[i]) continue;
                 if (self.shouldSkipIssue(issue)) continue;
                 const closed_at = issue.closed_at orelse continue;
-                if (std.mem.order(u8, closed_at, release.published_at) == .gt) continue;
+                if (std.mem.order(u8, closed_at, release.published_at.?) == .gt) continue;
 
                 assigned_issues[i] = true;
                 try self.appendSectionEntry(&sections_map, closed_issues_section_name, .{
@@ -274,8 +274,8 @@ pub const ChangelogGenerator = struct {
             }
 
             result.appendAssumeCapacity(.{
-                .version = release.tag_name,
-                .date = release.published_at,
+                .version = release.tag_name.?,
+                .date = release.published_at.?,
                 .sections = try self.buildSections(&sections_map),
             });
         }

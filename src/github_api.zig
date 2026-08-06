@@ -25,12 +25,12 @@ fn copyLabels(allocator: std.mem.Allocator, src: []const models.Label) ![]models
 }
 
 fn copyRelease(allocator: std.mem.Allocator, src: models.Release) !models.Release {
-    const tag_name = try allocator.dupe(u8, src.tag_name);
-    errdefer allocator.free(tag_name);
-    const name = try allocator.dupe(u8, src.name);
-    errdefer allocator.free(name);
-    const published_at = try allocator.dupe(u8, src.published_at);
-    return .{ .tag_name = tag_name, .name = name, .published_at = published_at };
+    const tag_name: ?[]const u8 = if (src.tag_name) |value| try allocator.dupe(u8, value) else null;
+    errdefer if (tag_name) |value| allocator.free(value);
+    const name: ?[]const u8 = if (src.name) |value| try allocator.dupe(u8, value) else null;
+    errdefer if (name) |value| allocator.free(value);
+    const published_at: ?[]const u8 = if (src.published_at) |value| try allocator.dupe(u8, value) else null;
+    return .{ .tag_name = tag_name, .name = name, .published_at = published_at, .draft = src.draft };
 }
 
 fn copyPullRequest(allocator: std.mem.Allocator, src: models.PullRequest) !models.PullRequest {
@@ -114,9 +114,9 @@ const github_page_size: u32 = 100;
 const github_page_size_usize: usize = @as(usize, github_page_size);
 
 fn freeRelease(allocator: std.mem.Allocator, release: models.Release) void {
-    allocator.free(release.tag_name);
-    allocator.free(release.name);
-    allocator.free(release.published_at);
+    if (release.tag_name) |value| allocator.free(value);
+    if (release.name) |value| allocator.free(value);
+    if (release.published_at) |value| allocator.free(value);
 }
 
 fn freePullRequest(allocator: std.mem.Allocator, pr: models.PullRequest) void {
@@ -375,6 +375,12 @@ fn buildPaginationPlan(
     };
 }
 
+/// Pagination decisions use the raw parsed page count, not the post-filter item
+/// count, so filtering drafts or pull-request markers never hides later pages.
+fn buildPlanForPage(page: anytype, degree_of_parallelism: u32) PaginationPlan {
+    return buildPaginationPlan(page.pagination, page.raw_page_count, degree_of_parallelism);
+}
+
 fn mergeOrderedPages(
     comptime T: type,
     allocator: std.mem.Allocator,
@@ -424,6 +430,23 @@ fn copyClosedIssues(allocator: std.mem.Allocator, src: []const models.Issue) ![]
     return try issues.toOwnedSlice(allocator);
 }
 
+fn copyNonDraftReleases(allocator: std.mem.Allocator, src: []const models.Release) ![]models.Release {
+    var releases = try std.ArrayList(models.Release).initCapacity(allocator, src.len);
+    errdefer {
+        for (releases.items) |release| {
+            freeRelease(allocator, release);
+        }
+        releases.deinit(allocator);
+    }
+
+    for (src) |release| {
+        if (release.draft or release.published_at == null or release.tag_name == null) continue;
+        releases.appendAssumeCapacity(try copyRelease(allocator, release));
+    }
+
+    return try releases.toOwnedSlice(allocator);
+}
+
 fn PageResult(comptime T: type) type {
     return struct {
         items: []T,
@@ -464,11 +487,7 @@ pub const GitHubApiClient = struct {
 
     fn getAllReleases(self: *GitHubApiClient, degree_of_parallelism: u32) ![]models.Release {
         const first_page = try self.fetchReleasePage(1);
-        const plan = buildPaginationPlan(
-            first_page.pagination,
-            first_page.items.len,
-            degree_of_parallelism,
-        );
+        const plan = buildPlanForPage(first_page, degree_of_parallelism);
 
         return switch (plan.strategy) {
             .single_page => first_page.items,
@@ -487,11 +506,7 @@ pub const GitHubApiClient = struct {
 
     fn getAllPullRequests(self: *GitHubApiClient, degree_of_parallelism: u32) ![]models.PullRequest {
         const first_page = try self.fetchPullRequestPage(1);
-        const plan = buildPaginationPlan(
-            first_page.pagination,
-            first_page.items.len,
-            degree_of_parallelism,
-        );
+        const plan = buildPlanForPage(first_page, degree_of_parallelism);
 
         return switch (plan.strategy) {
             .single_page => first_page.items,
@@ -510,11 +525,7 @@ pub const GitHubApiClient = struct {
 
     fn getAllClosedIssues(self: *GitHubApiClient, degree_of_parallelism: u32) ![]models.Issue {
         const first_page = try self.fetchIssuePage(1);
-        const plan = buildPaginationPlan(
-            first_page.pagination,
-            first_page.items.len,
-            degree_of_parallelism,
-        );
+        const plan = buildPlanForPage(first_page, degree_of_parallelism);
 
         return switch (plan.strategy) {
             .single_page => first_page.items,
@@ -575,23 +586,8 @@ pub const GitHubApiClient = struct {
         );
         defer parsed.deinit();
 
-        var releases = try std.ArrayList(models.Release).initCapacity(
-            self.allocator,
-            parsed.value.len,
-        );
-        errdefer {
-            for (releases.items) |release| {
-                freeRelease(self.allocator, release);
-            }
-            releases.deinit(self.allocator);
-        }
-
-        for (parsed.value) |release| {
-            releases.appendAssumeCapacity(try copyRelease(self.allocator, release));
-        }
-
         return .{
-            .items = try releases.toOwnedSlice(self.allocator),
+            .items = try copyNonDraftReleases(self.allocator, parsed.value),
             .pagination = parsePaginationInfo(response.link_header),
             .raw_page_count = parsed.value.len,
         };
@@ -1414,6 +1410,23 @@ test "buildPaginationPlan falls back when a full page has no link metadata" {
     try std.testing.expectEqual(@as(u32, 0), plan.worker_count);
 }
 
+test "buildPlanForPage counts full raw page even when drafts are filtered out" {
+    // First page held a full page of releases, but drafts were filtered so the
+    // returned items are below page size. Pagination must still be sequential.
+    const plan = buildPlanForPage(
+        PageResult(models.Release){
+            .items = &[_]models.Release{},
+            .pagination = .{},
+            .raw_page_count = github_page_size_usize,
+        },
+        4,
+    );
+
+    try std.testing.expectEqual(PaginationStrategy.sequential_fallback, plan.strategy);
+    try std.testing.expectEqual(@as(?u32, null), plan.total_pages);
+    try std.testing.expectEqual(@as(u32, 0), plan.worker_count);
+}
+
 test "copyClosedIssues skips pull request entries" {
     const td = @import("test_data.zig");
 
@@ -1432,6 +1445,45 @@ test "copyClosedIssues skips pull request entries" {
     try std.testing.expectEqual(@as(u32, 910), issues[0].number);
     try std.testing.expectEqual(@as(u32, 912), issues[1].number);
     try std.testing.expectEqualStrings("2024-01-13T09:00:00Z", issues[0].closed_at.?);
+}
+
+test "copyNonDraftReleases skips draft releases" {
+    const td = @import("test_data.zig");
+
+    var parsed = try std.json.parseFromSlice(
+        []models.Release,
+        std.testing.allocator,
+        td.test_releases_with_draft,
+        .{},
+    );
+    defer parsed.deinit();
+
+    const releases = try copyNonDraftReleases(std.testing.allocator, parsed.value);
+    defer freeReleaseSlice(std.testing.allocator, releases);
+
+    try std.testing.expectEqual(@as(usize, 1), releases.len);
+    try std.testing.expectEqualStrings("0.3.6", releases[0].tag_name.?);
+    try std.testing.expectEqualStrings("2026-03-20T17:14:17Z", releases[0].published_at.?);
+    try std.testing.expect(!releases[0].draft);
+}
+
+test "copyNonDraftReleases cleans up on allocation failure" {
+    const td = @import("test_data.zig");
+
+    var parsed = try std.json.parseFromSlice(
+        []models.Release,
+        std.testing.allocator,
+        td.test_releases_with_draft,
+        .{},
+    );
+    defer parsed.deinit();
+
+    // 5 allocation points: ArrayList backing, tag_name, name, published_at dupes,
+    // then toOwnedSlice allocating a trimmed copy when drafts shrink the array.
+    for (0..5) |i| {
+        var fa = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = i });
+        try std.testing.expectError(error.OutOfMemory, copyNonDraftReleases(fa.allocator(), parsed.value));
+    }
 }
 
 test "mergeOrderedPages preserves PR ordering across page slots" {

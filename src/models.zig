@@ -1,9 +1,10 @@
 const std = @import("std");
 
 pub const Release = struct {
-    tag_name: []const u8,
-    name: []const u8,
-    published_at: []const u8,
+    tag_name: ?[]const u8 = null,
+    name: ?[]const u8 = null,
+    published_at: ?[]const u8 = null,
+    draft: bool = false,
 };
 
 pub const PullRequest = struct {

@@ -377,6 +377,32 @@ pub const test_empty_releases =
     \\[]
 ;
 
+// Regression: draft releases must not appear in changelogs. Drafts have
+// published_at null and may have null tag_name/name; they must parse cleanly
+// and be filtered out, leaving only fully published releases.
+pub const test_releases_with_draft =
+    \\[
+    \\  {
+    \\    "tag_name": null,
+    \\    "name": null,
+    \\    "published_at": null,
+    \\    "draft": true
+    \\  },
+    \\  {
+    \\    "tag_name": "0.3.6",
+    \\    "name": "test",
+    \\    "published_at": null,
+    \\    "draft": true
+    \\  },
+    \\  {
+    \\    "tag_name": "0.3.6",
+    \\    "name": "0.3.6",
+    \\    "published_at": "2026-03-20T17:14:17Z",
+    \\    "draft": false
+    \\  }
+    \\]
+;
+
 pub const test_empty_prs =
     \\[]
 ;
