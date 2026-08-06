@@ -375,6 +375,12 @@ fn buildPaginationPlan(
     };
 }
 
+/// Pagination decisions use the raw parsed page count, not the post-filter item
+/// count, so filtering drafts or pull-request markers never hides later pages.
+fn buildPlanForPage(page: anytype, degree_of_parallelism: u32) PaginationPlan {
+    return buildPaginationPlan(page.pagination, page.raw_page_count, degree_of_parallelism);
+}
+
 fn mergeOrderedPages(
     comptime T: type,
     allocator: std.mem.Allocator,
@@ -1410,6 +1416,23 @@ test "buildPaginationPlan keeps releases single-page without pagination links" {
 
 test "buildPaginationPlan falls back when a full page has no link metadata" {
     const plan = buildPaginationPlan(.{}, github_page_size_usize, 4);
+
+    try std.testing.expectEqual(PaginationStrategy.sequential_fallback, plan.strategy);
+    try std.testing.expectEqual(@as(?u32, null), plan.total_pages);
+    try std.testing.expectEqual(@as(u32, 0), plan.worker_count);
+}
+
+test "buildPlanForPage counts full raw page even when drafts are filtered out" {
+    // First page held a full page of releases, but drafts were filtered so the
+    // returned items are below page size. Pagination must still be sequential.
+    const plan = buildPlanForPage(
+        PageResult(models.Release){
+            .items = &[_]models.Release{},
+            .pagination = .{},
+            .raw_page_count = github_page_size_usize,
+        },
+        4,
+    );
 
     try std.testing.expectEqual(PaginationStrategy.sequential_fallback, plan.strategy);
     try std.testing.expectEqual(@as(?u32, null), plan.total_pages);
