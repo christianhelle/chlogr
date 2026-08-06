@@ -49,6 +49,17 @@ pub fn build(b: *std.Build) void {
     const run_unit_tests = b.addRunArtifact(unit_tests);
     test_step.dependOn(&run_unit_tests.step);
 
+    // Unit tests for build install directory resolution
+    const install_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/build_install.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const run_install_tests = b.addRunArtifact(install_tests);
+    test_step.dependOn(&run_install_tests.step);
+
     const release_exe = b.addExecutable(.{
         .name = "chlogr",
         .root_module = b.createModule(.{
