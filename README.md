@@ -39,10 +39,20 @@ Requirements: Zig 0.16+
 zig build
 ```
 
-To build a release binary and install it to `~/.local/bin` (`%USERPROFILE%\.local\bin` on Windows, override with the `INSTALL_DIR` environment variable), run:
+To build a release binary and install it, run:
 
 ```bash
 zig build install-release
+```
+
+This installs to `~/.local/bin` on macOS/Linux and to `%USERPROFILE%\.local\bin` on Windows. Two overrides control the destination:
+
+- `--prefix <dir>` — installs to `<dir>/bin` (Zig's standard `{prefix}/bin` layout). Takes precedence over `INSTALL_DIR`.
+- `INSTALL_DIR=<dir>` — installs directly to `<dir>`, i.e. the executable directory.
+
+```bash
+zig build install-release --prefix /usr/local        # installs to /usr/local/bin
+INSTALL_DIR=$HOME/.local/bin zig build install-release
 ```
 
 Verify the installation with `chlogr --help`.
