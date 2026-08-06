@@ -10,7 +10,6 @@ pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const args = try init.minimal.args.toSlice(init.arena.allocator());
 
-
     const cli_parser = cli.CliParser.init(allocator);
     const parsed_args = cli_parser.parse(args) catch |err| {
         if (err == error.HelpRequested) {
@@ -33,7 +32,7 @@ pub fn main(init: std.process.Init) !void {
     const resolved_token = try resolver.resolve(parsed_args.token);
     defer resolver.deinit(resolved_token);
 
-    std.debug.print("GitHub Changelog Generator v0.1.0\n", .{});
+    std.debug.print("GitHub Changelog Generator v{s}\n", .{cli.VERSION});
     std.debug.print("Repo: {s}\n", .{parsed_args.repo.?});
     std.debug.print("Output: {s}\n", .{parsed_args.output});
 
