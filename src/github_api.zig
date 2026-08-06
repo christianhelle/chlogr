@@ -424,6 +424,23 @@ fn copyClosedIssues(allocator: std.mem.Allocator, src: []const models.Issue) ![]
     return try issues.toOwnedSlice(allocator);
 }
 
+fn copyNonDraftReleases(allocator: std.mem.Allocator, src: []const models.Release) ![]models.Release {
+    var releases = try std.ArrayList(models.Release).initCapacity(allocator, src.len);
+    errdefer {
+        for (releases.items) |release| {
+            freeRelease(allocator, release);
+        }
+        releases.deinit(allocator);
+    }
+
+    for (src) |release| {
+        if (release.draft or release.published_at == null or release.tag_name == null) continue;
+        releases.appendAssumeCapacity(try copyRelease(allocator, release));
+    }
+
+    return try releases.toOwnedSlice(allocator);
+}
+
 fn PageResult(comptime T: type) type {
     return struct {
         items: []T,
@@ -575,23 +592,8 @@ pub const GitHubApiClient = struct {
         );
         defer parsed.deinit();
 
-        var releases = try std.ArrayList(models.Release).initCapacity(
-            self.allocator,
-            parsed.value.len,
-        );
-        errdefer {
-            for (releases.items) |release| {
-                freeRelease(self.allocator, release);
-            }
-            releases.deinit(self.allocator);
-        }
-
-        for (parsed.value) |release| {
-            releases.appendAssumeCapacity(try copyRelease(self.allocator, release));
-        }
-
         return .{
-            .items = try releases.toOwnedSlice(self.allocator),
+            .items = try copyNonDraftReleases(self.allocator, parsed.value),
             .pagination = parsePaginationInfo(response.link_header),
             .raw_page_count = parsed.value.len,
         };
@@ -1432,6 +1434,44 @@ test "copyClosedIssues skips pull request entries" {
     try std.testing.expectEqual(@as(u32, 910), issues[0].number);
     try std.testing.expectEqual(@as(u32, 912), issues[1].number);
     try std.testing.expectEqualStrings("2024-01-13T09:00:00Z", issues[0].closed_at.?);
+}
+
+test "copyNonDraftReleases skips draft releases" {
+    const td = @import("test_data.zig");
+
+    var parsed = try std.json.parseFromSlice(
+        []models.Release,
+        std.testing.allocator,
+        td.test_releases_with_draft,
+        .{},
+    );
+    defer parsed.deinit();
+
+    const releases = try copyNonDraftReleases(std.testing.allocator, parsed.value);
+    defer freeReleaseSlice(std.testing.allocator, releases);
+
+    try std.testing.expectEqual(@as(usize, 1), releases.len);
+    try std.testing.expectEqualStrings("0.3.6", releases[0].tag_name.?);
+    try std.testing.expectEqualStrings("2026-03-20T17:14:17Z", releases[0].published_at.?);
+    try std.testing.expect(!releases[0].draft);
+}
+
+test "copyNonDraftReleases cleans up on allocation failure" {
+    const td = @import("test_data.zig");
+
+    var parsed = try std.json.parseFromSlice(
+        []models.Release,
+        std.testing.allocator,
+        td.test_releases_with_draft,
+        .{},
+    );
+    defer parsed.deinit();
+
+    // 4 allocations before toOwnedSlice: ArrayList backing + tag_name, name, published_at dupes
+    for (0..4) |i| {
+        var fa = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = i });
+        try std.testing.expectError(error.OutOfMemory, copyNonDraftReleases(fa.allocator(), parsed.value));
+    }
 }
 
 test "mergeOrderedPages preserves PR ordering across page slots" {
