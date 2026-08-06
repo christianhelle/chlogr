@@ -1467,8 +1467,9 @@ test "copyNonDraftReleases cleans up on allocation failure" {
     );
     defer parsed.deinit();
 
-    // 4 allocations before toOwnedSlice: ArrayList backing + tag_name, name, published_at dupes
-    for (0..4) |i| {
+    // 5 allocation points: ArrayList backing, tag_name, name, published_at dupes,
+    // then toOwnedSlice allocating a trimmed copy when drafts shrink the array.
+    for (0..5) |i| {
         var fa = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = i });
         try std.testing.expectError(error.OutOfMemory, copyNonDraftReleases(fa.allocator(), parsed.value));
     }
