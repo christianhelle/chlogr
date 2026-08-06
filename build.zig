@@ -48,7 +48,22 @@ pub fn build(b: *std.Build) void {
     });
     const run_unit_tests = b.addRunArtifact(unit_tests);
     test_step.dependOn(&run_unit_tests.step);
+
+    const release_exe = b.addExecutable(.{
+        .name = "chlogr",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = .ReleaseSmall,
+        }),
+    });
+
+    const install_release_step = b.step("install-release", "Build ReleaseSmall and install to $HOME/.local/bin");
+    const install_release = InstallReleaseStep.create(b, release_exe.getEmittedBin(), getInstallPrefix(b), release_exe.out_filename);
+    install_release_step.dependOn(&install_release.step);
 }
+
+fn getInstallPrefix(b: *std.Build) []const u8 {
 
 fn getInstallPrefix(b: *std.Build) []const u8 {
     // Honor an explicit `--prefix` flag.
