@@ -64,8 +64,6 @@ pub fn build(b: *std.Build) void {
 }
 
 fn getInstallPrefix(b: *std.Build) []const u8 {
-
-fn getInstallPrefix(b: *std.Build) []const u8 {
     // Honor an explicit `--prefix` flag.
     const default_prefix = b.build_root.join(b.allocator, &.{"zig-out"}) catch @panic("OOM");
     if (!std.mem.eql(u8, b.install_prefix, default_prefix)) {
