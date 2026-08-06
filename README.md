@@ -31,13 +31,31 @@ irm https://christianhelle.com/chlogr/install.ps1 | iex
 
 The install scripts download the latest release binary from GitHub Releases. The bash script installs to `~/.local/bin` (override with the `INSTALL_DIR` environment variable), and the PowerShell script installs to `%USERPROFILE%\.local\bin`. Verify the installation with `chlogr --help`.
 
-## Building
+### Building from source
 
 Requirements: Zig 0.16+
 
 ```bash
 zig build
 ```
+
+To build a release binary and install it, run:
+
+```bash
+zig build install-release
+```
+
+This installs to `~/.local/bin` on macOS/Linux and to `%USERPROFILE%\.local\bin` on Windows. Two overrides control the destination:
+
+- `--prefix <dir>` — installs to `<dir>/bin` (Zig's standard `{prefix}/bin` layout). Takes precedence over `INSTALL_DIR`.
+- `INSTALL_DIR=<dir>` — installs directly to `<dir>`, i.e. the executable directory.
+
+```bash
+zig build install-release --prefix /usr/local        # installs to /usr/local/bin
+INSTALL_DIR=$HOME/.local/bin zig build install-release
+```
+
+Verify the installation with `chlogr --help`.
 
 ## Usage
 
