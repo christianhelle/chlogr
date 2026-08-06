@@ -25,12 +25,12 @@ fn copyLabels(allocator: std.mem.Allocator, src: []const models.Label) ![]models
 }
 
 fn copyRelease(allocator: std.mem.Allocator, src: models.Release) !models.Release {
-    const tag_name = try allocator.dupe(u8, src.tag_name);
-    errdefer allocator.free(tag_name);
-    const name = try allocator.dupe(u8, src.name);
-    errdefer allocator.free(name);
-    const published_at = try allocator.dupe(u8, src.published_at);
-    return .{ .tag_name = tag_name, .name = name, .published_at = published_at };
+    const tag_name: ?[]const u8 = if (src.tag_name) |value| try allocator.dupe(u8, value) else null;
+    errdefer if (tag_name) |value| allocator.free(value);
+    const name: ?[]const u8 = if (src.name) |value| try allocator.dupe(u8, value) else null;
+    errdefer if (name) |value| allocator.free(value);
+    const published_at: ?[]const u8 = if (src.published_at) |value| try allocator.dupe(u8, value) else null;
+    return .{ .tag_name = tag_name, .name = name, .published_at = published_at, .draft = src.draft };
 }
 
 fn copyPullRequest(allocator: std.mem.Allocator, src: models.PullRequest) !models.PullRequest {
@@ -114,9 +114,9 @@ const github_page_size: u32 = 100;
 const github_page_size_usize: usize = @as(usize, github_page_size);
 
 fn freeRelease(allocator: std.mem.Allocator, release: models.Release) void {
-    allocator.free(release.tag_name);
-    allocator.free(release.name);
-    allocator.free(release.published_at);
+    if (release.tag_name) |value| allocator.free(value);
+    if (release.name) |value| allocator.free(value);
+    if (release.published_at) |value| allocator.free(value);
 }
 
 fn freePullRequest(allocator: std.mem.Allocator, pr: models.PullRequest) void {

@@ -1098,7 +1098,7 @@ pub fn main() !void {
 
     std.debug.print("Found {d} releases\n", .{releases.len});
     for (releases) |release| {
-        std.debug.print("  - {s} ({s})\n", .{ release.tag_name, release.published_at });
+        std.debug.print("  - {s} ({s})\n", .{ release.tag_name.?, release.published_at.? });
     }
 
     std.debug.print("\nParsing mock pull requests...\n", .{});
