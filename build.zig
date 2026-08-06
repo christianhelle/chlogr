@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_install = @import("src/build_install.zig");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -69,32 +70,14 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    const install_release_step = b.step("install-release", "Build ReleaseSmall and install to $HOME/.local/bin");
+    const install_release_step = b.step("install-release", "Build ReleaseSmall and install to ~/.local/bin (%USERPROFILE%/.local/bin on Windows)");
     const install_release = InstallReleaseStep.create(b, release_exe.getEmittedBin(), getInstallPrefix(b), release_exe.out_filename);
     install_release_step.dependOn(&install_release.step);
 }
 
 fn getInstallPrefix(b: *std.Build) []const u8 {
-    // Honor an explicit `--prefix` flag.
     const default_prefix = b.build_root.join(b.allocator, &.{"zig-out"}) catch @panic("OOM");
-    if (!std.mem.eql(u8, b.install_prefix, default_prefix)) {
-        return b.install_prefix;
-    }
-
-    // Honor the INSTALL_DIR environment variable used by the install scripts.
-    if (b.graph.environ_map.get("INSTALL_DIR")) |install_dir| {
-        if (install_dir.len > 0) return install_dir;
-    }
-
-    // Default to $HOME/.local/bin, falling back to %USERPROFILE% on Windows.
-    if (b.graph.environ_map.get("HOME")) |home| {
-        if (home.len > 0) return b.pathJoin(&.{ home, ".local", "bin" });
-    }
-    if (b.graph.environ_map.get("USERPROFILE")) |home| {
-        if (home.len > 0) return b.pathJoin(&.{ home, ".local", "bin" });
-    }
-
-    @panic("unable to determine install directory: set HOME, USERPROFILE, or INSTALL_DIR");
+    return build_install.resolveInstallDir(b.allocator, b.install_prefix, default_prefix, &b.graph.environ_map, @import("builtin").os.tag);
 }
 
 const InstallReleaseStep = struct {
