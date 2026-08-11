@@ -3,6 +3,12 @@
 ## [Unreleased Changes]
 
 ### Features
+- Strip debug info from release binaries ([#51](https://github.com/christianhelle/chlogr/pull/51)) ([@christianhelle](https://github.com/christianhelle/))
+
+
+## [0.3.8](https://github.com/christianhelle/chlogr/releases/tag/0.3.8) (2026-08-11)
+
+### Features
 - Add footer to generated output ([#50](https://github.com/christianhelle/chlogr/pull/50)) ([@christianhelle](https://github.com/christianhelle/))
 - Add zig build install-release step ([#49](https://github.com/christianhelle/chlogr/pull/49)) ([@christianhelle](https://github.com/christianhelle/))
 
