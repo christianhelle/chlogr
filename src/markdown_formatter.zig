@@ -134,6 +134,9 @@ pub const MarkdownFormatter = struct {
         defer file.close(self.io);
 
         try file.writeStreamingAll(self.io, content);
+        try file.writeStreamingAll(self.io, "---\n");
+        try file.writeStreamingAll(self.io, "***This changelog was generated with [chlogr](https://github.com/christianhelle/chlogr). ");
+        try file.writeStreamingAll(self.io, "Any changes to this file will be overwritten.***");
     }
 
     pub fn deinit(self: MarkdownFormatter, content: []u8) void {
