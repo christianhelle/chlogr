@@ -3,6 +3,7 @@
 ## [Unreleased Changes]
 
 ### Features
+- Add footer to generated output ([#50](https://github.com/christianhelle/chlogr/pull/50)) ([@christianhelle](https://github.com/christianhelle/))
 - Add zig build install-release step ([#49](https://github.com/christianhelle/chlogr/pull/49)) ([@christianhelle](https://github.com/christianhelle/))
 
 
@@ -95,3 +96,5 @@
 - feat: zero-dependency http client ([#1](https://github.com/christianhelle/chlogr/pull/1)) ([@christianhelle](https://github.com/christianhelle/))
 
 
+---
+***This changelog was generated with [chlogr](https://github.com/christianhelle/chlogr). Any changes to this file will be overwritten.***
