@@ -11,6 +11,12 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
+            // Zig 0.16 only strips ReleaseSmall by default; strip release
+            // builds so the released binaries don't embed DWARF debug info.
+            .strip = switch (optimize) {
+                .Debug, .ReleaseSafe => false,
+                .ReleaseFast, .ReleaseSmall => true,
+            },
         }),
     });
 
