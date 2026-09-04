@@ -12,7 +12,7 @@ A fast, efficient, native CLI tool to automatically generate changelogs from Git
 - Smart token resolution (--token flag → env vars → `gh auth token` CLI)
 - Works with any GitHub repository
 - Progress output during fetch — per-section headers and page counters keep you informed on large repos
-- Optional parallel fetching (`--parallel <N>`) — fetches releases, PRs, and closed issues concurrently; release and PR pagination use bounded page concurrency
+- Optional parallel fetching (`--parallel <N>`) — fetches releases, PRs, and closed issues concurrently; pagination uses bounded page concurrency
 - Fully functional core logic verified with integration tests
 
 ## Installation
@@ -77,7 +77,7 @@ chlogr --repo [org]/[repo] --token ghp_xxxxxxxxxxxx
 chlogr --repo [org]/[repo] --parallel 4
 ```
 
-Use `--parallel <N>` on large repositories with many releases, pull requests, and closed issues to fetch all three streams together while letting release and PR pagination use up to `N` concurrent page requests per stream.
+Use `--parallel <N>` on large repositories with many releases, pull requests, and closed issues to fetch all three streams together while letting pagination use up to `N` concurrent page requests per stream.
 
 ### Options
 
@@ -87,7 +87,7 @@ Use `--parallel <N>` on large repositories with many releases, pull requests, an
 - `--since-tag` (optional): Start from this tag/version
 - `--until-tag` (optional): End at this tag/version
 - `--exclude-labels` (optional): Comma-separated labels to exclude (e.g., duplicate,wontfix)
-- `--parallel <N>` (optional): Fetch releases, pull requests, and closed issues concurrently; release and PR pagination use up to `N` page requests per stream
+- `--parallel <N>` (optional): Fetch releases, pull requests, and closed issues concurrently; pagination uses up to `N` page requests per stream
 
 ### Authentication
 
@@ -168,8 +168,8 @@ src/
   ├── cli.zig                 # CLI argument parsing
   ├── token_resolver.zig      # GitHub token resolution
   ├── models.zig              # Data structures
-  ├── http_client.zig         # HTTP client wrapper
   ├── github_api.zig          # GitHub API integration
+  ├── github/                 # Generated GitHub REST API client (openapi2zig)
   ├── changelog_generator.zig # Core changelog logic
   ├── markdown_formatter.zig  # Markdown output formatting
   ├── test_data.zig           # Mock test data
