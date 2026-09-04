@@ -3,6 +3,7 @@
 ## [Unreleased Changes]
 
 ### Features
+- Use the generated OpenAPI client for GitHub API requests ([#52](https://github.com/christianhelle/chlogr/pull/52)) ([@christianhelle](https://github.com/christianhelle/))
 - Strip debug info from release binaries ([#51](https://github.com/christianhelle/chlogr/pull/51)) ([@christianhelle](https://github.com/christianhelle/))
 
 
