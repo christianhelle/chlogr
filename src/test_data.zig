@@ -618,19 +618,3 @@ pub const test_prs_for_four_versions =
     \\  }
     \\]
 ;
-
-pub const test_prs_link_header_last_page =
-    \\<https://api.github.com/repos/owner/repo/pulls?state=closed&page=2&per_page=100&sort=updated&direction=desc>; rel="next", <https://api.github.com/repos/owner/repo/pulls?state=closed&page=4&per_page=100&sort=updated&direction=desc>; rel="last"
-;
-
-pub const test_prs_link_header_next_only =
-    \\<https://api.github.com/repos/owner/repo/pulls?state=closed&page=2&per_page=100&sort=updated&direction=desc>; rel="next"
-;
-
-pub const test_prs_link_header_malformed_last =
-    \\<https://api.github.com/repos/owner/repo/pulls?state=closed&page=2&per_page=100&sort=updated&direction=desc>; rel="next", <https://api.github.com/repos/owner/repo/pulls?state=closed&page=oops&per_page=100&sort=updated&direction=desc>; rel="last"
-;
-
-pub const test_releases_link_header_multiple_relations =
-    \\<https://api.github.com/repos/owner/repo/releases?page=1&per_page=100>; rel="prev", <https://api.github.com/repos/owner/repo/releases?page=2&per_page=100>; rel="next", <https://api.github.com/repos/owner/repo/releases?page=3&per_page=100>; rel="last"
-;
