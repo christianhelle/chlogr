@@ -175,15 +175,34 @@ fn freeIssueSlice(allocator: std.mem.Allocator, issues: []models.Issue) void {
 const PaginationStrategy = enum {
     single_page,
     sequential,
+    bounded_parallel,
+};
+
+const PaginationPlan = struct {
+    strategy: PaginationStrategy,
+    worker_count: u32 = 0,
 };
 
 /// Pagination decisions use the raw parsed page count, not the post-filter item
 /// count, so filtering drafts or pull-request markers never hides later pages.
 /// The generated client does not expose response headers, so page counts are
-/// discovered from page fullness: a short page is always the last one.
-fn buildPaginationPlan(raw_page_count: usize) PaginationStrategy {
-    if (raw_page_count < github_page_size_usize) return .single_page;
-    return .sequential;
+/// discovered from page fullness: a short page is always the last one. When
+/// parallel fetching is enabled, full pages are followed by speculative batches
+/// of up to `degree_of_parallelism` concurrent page requests until a batch
+/// contains the final short (or empty) page.
+fn buildPaginationPlan(raw_page_count: usize, degree_of_parallelism: u32) PaginationPlan {
+    if (raw_page_count < github_page_size_usize) {
+        return .{ .strategy = .single_page };
+    }
+
+    if (degree_of_parallelism <= 1) {
+        return .{ .strategy = .sequential };
+    }
+
+    return .{
+        .strategy = .bounded_parallel,
+        .worker_count = degree_of_parallelism,
+    };
 }
 
 fn PageResult(comptime T: type) type {
@@ -235,18 +254,15 @@ pub const GitHubApiClient = struct {
     }
 
     fn getAllReleases(self: *GitHubApiClient, degree_of_parallelism: u32) ![]models.Release {
-        _ = degree_of_parallelism;
-        return self.getAll(models.Release, releases_ops);
+        return self.getAll(models.Release, releases_ops, degree_of_parallelism);
     }
 
     fn getAllPullRequests(self: *GitHubApiClient, degree_of_parallelism: u32) ![]models.PullRequest {
-        _ = degree_of_parallelism;
-        return self.getAll(models.PullRequest, pull_requests_ops);
+        return self.getAll(models.PullRequest, pull_requests_ops, degree_of_parallelism);
     }
 
     fn getAllClosedIssues(self: *GitHubApiClient, degree_of_parallelism: u32) ![]models.Issue {
-        _ = degree_of_parallelism;
-        return self.getAll(models.Issue, issues_ops);
+        return self.getAll(models.Issue, issues_ops, degree_of_parallelism);
     }
 
     const releases_ops = ResourceOps(models.Release){
@@ -267,11 +283,25 @@ pub const GitHubApiClient = struct {
         .freeElement = freeIssue,
     };
 
-    fn getAll(self: *GitHubApiClient, comptime T: type, ops: ResourceOps(T)) ![]T {
+    fn getAll(
+        self: *GitHubApiClient,
+        comptime T: type,
+        ops: ResourceOps(T),
+        degree_of_parallelism: u32,
+    ) ![]T {
         const first_page = try ops.fetchPage(self, 1);
-        return switch (buildPaginationPlan(first_page.raw_page_count)) {
+        const plan = buildPaginationPlan(first_page.raw_page_count, degree_of_parallelism);
+
+        return switch (plan.strategy) {
             .single_page => first_page.items,
             .sequential => self.fetchRemainingSequential(T, ops, first_page.items, 2),
+            .bounded_parallel => self.fetchRemainingParallel(
+                T,
+                ops,
+                first_page.items,
+                2,
+                plan.worker_count,
+            ),
         };
     }
 
@@ -434,6 +464,109 @@ pub const GitHubApiClient = struct {
             try self.appendMovedPage(T, ops, &items, page_result.items);
 
             if (last_page) break;
+        }
+
+        return try items.toOwnedSlice(self.allocator);
+    }
+
+    fn fetchRemainingParallel(
+        self: *GitHubApiClient,
+        comptime T: type,
+        ops: ResourceOps(T),
+        first_page_items: []T,
+        start_page: u32,
+        batch_size: u32,
+    ) ![]T {
+        const PageSlot = struct {
+            items: ?[]T = null,
+            raw_page_count: usize = 0,
+            err: ?anyerror = null,
+        };
+        const Worker = struct {
+            fn run(client: *GitHubApiClient, worker_ops: ResourceOps(T), page: u32, slot: *PageSlot) void {
+                const result = worker_ops.fetchPage(client, page) catch |err| {
+                    slot.* = .{ .err = err };
+                    return;
+                };
+                slot.* = .{ .items = result.items, .raw_page_count = result.raw_page_count };
+            }
+        };
+
+        var items = try std.ArrayList(T).initCapacity(
+            self.allocator,
+            first_page_items.len,
+        );
+        errdefer {
+            for (items.items) |item| {
+                ops.freeElement(self.allocator, item);
+            }
+            items.deinit(self.allocator);
+        }
+
+        try self.appendMovedPage(T, ops, &items, first_page_items);
+
+        const batch_size_usize: usize = @intCast(batch_size);
+        const slots = try self.allocator.alloc(PageSlot, batch_size_usize);
+        defer self.allocator.free(slots);
+
+        var next_page = start_page;
+        while (true) {
+            @memset(slots, .{});
+
+            var threads = try std.ArrayList(std.Thread).initCapacity(
+                self.allocator,
+                batch_size_usize,
+            );
+            defer threads.deinit(self.allocator);
+
+            for (0..batch_size_usize) |slot_index| {
+                const page = next_page + @as(u32, @intCast(slot_index));
+                const thread = std.Thread.spawn(.{}, Worker.run, .{ self, ops, page, &slots[slot_index] }) catch |err| {
+                    for (threads.items) |started_thread| {
+                        started_thread.join();
+                    }
+                    for (slots) |*slot| {
+                        if (slot.items) |page_items| {
+                            ops.freeSlice(self.allocator, page_items);
+                        }
+                    }
+                    return err;
+                };
+                threads.appendAssumeCapacity(thread);
+            }
+
+            for (threads.items) |thread| {
+                thread.join();
+            }
+
+            var reached_end = false;
+            for (slots, 0..) |*slot, slot_index| {
+                if (reached_end) {
+                    // Pages past the first short page are beyond the end of the
+                    // list; GitHub answers them with empty arrays.
+                    if (slot.items) |page_items| {
+                        ops.freeSlice(self.allocator, page_items);
+                    }
+                    continue;
+                }
+
+                if (slot.err) |err| {
+                    for (slots[slot_index..]) |*rest| {
+                        if (rest.items) |page_items| {
+                            ops.freeSlice(self.allocator, page_items);
+                        }
+                    }
+                    return err;
+                }
+
+                try self.appendMovedPage(T, ops, &items, slot.items.?);
+                if (slot.raw_page_count < github_page_size_usize) {
+                    reached_end = true;
+                }
+            }
+
+            if (reached_end) break;
+            next_page += batch_size;
         }
 
         return try items.toOwnedSlice(self.allocator);
@@ -687,11 +820,29 @@ test "ParallelFetchResults default fields" {
     try std.testing.expect(r.issues_err == null);
 }
 
+test "buildPaginationPlan keeps a short page single-page" {
+    const plan = buildPaginationPlan(github_page_size_usize - 1, 4);
+    try std.testing.expectEqual(PaginationStrategy.single_page, plan.strategy);
+    try std.testing.expectEqual(@as(u32, 0), plan.worker_count);
+}
+
+test "buildPaginationPlan paginates a full page sequentially without parallelism" {
+    const plan = buildPaginationPlan(github_page_size_usize, 1);
+    try std.testing.expectEqual(PaginationStrategy.sequential, plan.strategy);
+    try std.testing.expectEqual(@as(u32, 0), plan.worker_count);
+}
+
+test "buildPaginationPlan batches a full page across parallel workers" {
+    const plan = buildPaginationPlan(github_page_size_usize, 4);
+    try std.testing.expectEqual(PaginationStrategy.bounded_parallel, plan.strategy);
+    try std.testing.expectEqual(@as(u32, 4), plan.worker_count);
+}
+
 test "buildPaginationPlan uses the raw page count, not the filtered item count" {
     // A full page of drafts filters down to zero items; pagination must still
     // continue from the raw count, or later pages would never be fetched.
-    try std.testing.expectEqual(PaginationStrategy.single_page, buildPaginationPlan(github_page_size_usize - 1));
-    try std.testing.expectEqual(PaginationStrategy.sequential, buildPaginationPlan(github_page_size_usize));
+    const plan = buildPaginationPlan(github_page_size_usize, 4);
+    try std.testing.expectEqual(PaginationStrategy.bounded_parallel, plan.strategy);
 }
 
 test "copyClosedIssues skips pull request entries" {
