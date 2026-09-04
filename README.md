@@ -87,7 +87,7 @@ Use `--parallel <N>` on large repositories with many releases, pull requests, an
 - `--since-tag` (optional): Start from this tag/version
 - `--until-tag` (optional): End at this tag/version
 - `--exclude-labels` (optional): Comma-separated labels to exclude (e.g., duplicate,wontfix)
-- `--parallel <N>` (optional): Fetch releases, pull requests, and closed issues concurrently; pagination uses up to `N` page requests per stream
+- `--parallel <N>` (optional): Fetch releases, pull requests, and closed issues concurrently; pagination uses up to `N` page requests per stream (default: 4)
 
 ### Authentication
 
