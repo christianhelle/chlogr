@@ -15,5 +15,5 @@ irm https://christianhelle.com/openapi2zig/install.ps1 | iex
 then run the following:
 
 ```bash
-openapi2zig generate -i openapi.json -o . --multiple-files --tag issues --tag pulls
+openapi2zig generate -i openapi.json -o . --multiple-files --tag issues --tag pulls --tag repos
 ```
