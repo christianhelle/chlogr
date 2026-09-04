@@ -845,6 +845,92 @@ test "buildPaginationPlan uses the raw page count, not the filtered item count" 
     try std.testing.expectEqual(PaginationStrategy.bounded_parallel, plan.strategy);
 }
 
+fn FakePageOps(comptime failing_page: ?u32) type {
+    return struct {
+        // Pages below 3 are full, page 3 is short, anything past it is empty.
+        fn fetchPage(_: *GitHubApiClient, page: u32) anyerror!PageResult(u32) {
+            if (failing_page) |bad_page| {
+                if (page == bad_page) return error.GitHubApiError;
+            }
+            const count: usize = if (page < 3) github_page_size_usize else if (page == 3) 3 else 0;
+            const page_items = try std.testing.allocator.alloc(u32, count);
+            for (page_items, 0..) |*item, i| {
+                item.* = page * 1000 + @as(u32, @intCast(i));
+            }
+            return .{ .items = page_items, .raw_page_count = count };
+        }
+
+        fn freeSlice(allocator: std.mem.Allocator, items: []u32) void {
+            allocator.free(items);
+        }
+
+        fn freeElement(_: std.mem.Allocator, _: u32) void {}
+
+        fn ops() ResourceOps(u32) {
+            return .{
+                .fetchPage = fetchPage,
+                .freeSlice = freeSlice,
+                .freeElement = freeElement,
+            };
+        }
+    };
+}
+
+fn testClient(allocator: std.mem.Allocator) GitHubApiClient {
+    return .{
+        .allocator = allocator,
+        .client = github.Client.init(allocator, std.testing.io, ""),
+        .owner = "owner",
+        .repo_name = "repo",
+    };
+}
+
+test "fetchRemainingSequential appends pages in order until a short page" {
+    const allocator = std.testing.allocator;
+    var client = testClient(allocator);
+    defer client.deinit();
+
+    const ops = FakePageOps(null).ops();
+    const first_page = try ops.fetchPage(&client, 1);
+
+    const items = try client.fetchRemainingSequential(u32, ops, first_page.items, 2);
+    defer allocator.free(items);
+
+    try std.testing.expectEqual(2 * github_page_size_usize + 3, items.len);
+    try std.testing.expectEqual(@as(u32, 1000), items[0]);
+    try std.testing.expectEqual(@as(u32, 3002), items[items.len - 1]);
+}
+
+test "fetchRemainingParallel preserves page order and stops at the first short page" {
+    const allocator = std.testing.allocator;
+    var client = testClient(allocator);
+    defer client.deinit();
+
+    const ops = FakePageOps(null).ops();
+    const first_page = try ops.fetchPage(&client, 1);
+
+    const items = try client.fetchRemainingParallel(u32, ops, first_page.items, 2, 4);
+    defer allocator.free(items);
+
+    try std.testing.expectEqual(2 * github_page_size_usize + 3, items.len);
+    try std.testing.expectEqual(@as(u32, 1000), items[0]);
+    try std.testing.expectEqual(@as(u32, 3002), items[items.len - 1]);
+}
+
+test "fetchRemainingParallel propagates page errors" {
+    const allocator = std.testing.allocator;
+    var client = testClient(allocator);
+    defer client.deinit();
+
+    const ops = FakePageOps(3).ops();
+    const first_page = try ops.fetchPage(&client, 1);
+
+    try std.testing.expectError(
+        error.GitHubApiError,
+        client.fetchRemainingParallel(u32, ops, first_page.items, 2, 4),
+    );
+}
+
 test "copyClosedIssues skips pull request entries" {
     const td = @import("test_data.zig");
 
