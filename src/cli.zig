@@ -32,6 +32,13 @@ pub const CliParser = struct {
             if (std.mem.eql(u8, arg, "--repo")) {
                 i += 1;
                 if (i >= args.len) return error.MissingRepoValue;
+                if (!isValidRepoFormat(args[i])) {
+                    std.debug.print(
+                        "Invalid --repo value: {s} (expected <owner>/<repo>)\n",
+                        .{args[i]},
+                    );
+                    return error.InvalidRepoFormat;
+                }
                 result.repo = args[i];
             } else if (std.mem.eql(u8, arg, "--token")) {
                 i += 1;
@@ -114,6 +121,14 @@ pub const CliParser = struct {
         std.debug.print("{s}", .{help_text});
     }
 };
+
+fn isValidRepoFormat(value: []const u8) bool {
+    const slash = std.mem.indexOfScalar(u8, value, '/') orelse return false;
+    if (slash == 0 or slash == value.len - 1) return false;
+    // GitHub owner and repo names cannot contain '/', so a second one is invalid
+    if (std.mem.indexOfScalarPos(u8, value, slash + 1, '/') != null) return false;
+    return true;
+}
 
 // CLI Parsing Tests
 
@@ -287,6 +302,46 @@ test "parse --parallel with invalid value" {
     const result = parser.parse(&args);
 
     try std.testing.expectError(error.InvalidParallelValue, result);
+}
+
+test "parse --repo without separator returns InvalidRepoFormat error" {
+    const allocator = std.testing.allocator;
+    const parser = CliParser.init(allocator);
+
+    const args = [_][]const u8{ "chlogr", "--repo", "foo" };
+    const result = parser.parse(&args);
+
+    try std.testing.expectError(error.InvalidRepoFormat, result);
+}
+
+test "parse --repo with empty owner returns InvalidRepoFormat error" {
+    const allocator = std.testing.allocator;
+    const parser = CliParser.init(allocator);
+
+    const args = [_][]const u8{ "chlogr", "--repo", "/repo" };
+    const result = parser.parse(&args);
+
+    try std.testing.expectError(error.InvalidRepoFormat, result);
+}
+
+test "parse --repo with empty repo returns InvalidRepoFormat error" {
+    const allocator = std.testing.allocator;
+    const parser = CliParser.init(allocator);
+
+    const args = [_][]const u8{ "chlogr", "--repo", "owner/" };
+    const result = parser.parse(&args);
+
+    try std.testing.expectError(error.InvalidRepoFormat, result);
+}
+
+test "parse --repo with extra separators returns InvalidRepoFormat error" {
+    const allocator = std.testing.allocator;
+    const parser = CliParser.init(allocator);
+
+    const args = [_][]const u8{ "chlogr", "--repo", "a/b/c" };
+    const result = parser.parse(&args);
+
+    try std.testing.expectError(error.InvalidRepoFormat, result);
 }
 
 test "parse --repo owner/repo --parallel 10" {
