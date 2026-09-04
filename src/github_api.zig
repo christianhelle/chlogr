@@ -238,6 +238,20 @@ pub const GitHubApiClient = struct {
         };
     }
 
+    /// Build an independent client for a single worker thread. Concurrent page
+    /// fetches must not share one `github.Client` (and its `std.http.Client`)
+    /// across threads.
+    fn workerClient(self: *GitHubApiClient) GitHubApiClient {
+        var client = github.Client.init(self.allocator, self.client.io, self.client.api_key);
+        client.withBaseUrl(self.client.base_url);
+        return .{
+            .allocator = self.allocator,
+            .client = client,
+            .owner = self.owner,
+            .repo_name = self.repo_name,
+        };
+    }
+
     /// Fetch all releases/tags for the repository (paginated)
     pub fn getReleases(self: *GitHubApiClient) ![]models.Release {
         return self.getAllReleases(1);
@@ -483,8 +497,10 @@ pub const GitHubApiClient = struct {
             err: ?anyerror = null,
         };
         const Worker = struct {
-            fn run(client: *GitHubApiClient, worker_ops: ResourceOps(T), page: u32, slot: *PageSlot) void {
-                const result = worker_ops.fetchPage(client, page) catch |err| {
+            fn run(template: *GitHubApiClient, worker_ops: ResourceOps(T), page: u32, slot: *PageSlot) void {
+                var client = template.workerClient();
+                defer client.deinit();
+                const result = worker_ops.fetchPage(&client, page) catch |err| {
                     slot.* = .{ .err = err };
                     return;
                 };
