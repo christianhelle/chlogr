@@ -321,7 +321,7 @@ pub const GitHubApiClient = struct {
 
     fn fetchReleasePage(self: *GitHubApiClient, page: u32) !PageResult(models.Release) {
         std.debug.print("  Fetching releases page {d}...\n", .{page});
-        var raw = try github.@"repos/list-releasesRaw"(
+        var raw = try github.reposListReleasesRaw(
             &self.client,
             self.owner,
             self.repo_name,
@@ -350,7 +350,7 @@ pub const GitHubApiClient = struct {
 
     fn fetchPullRequestPage(self: *GitHubApiClient, page: u32) !PageResult(models.PullRequest) {
         std.debug.print("  Fetching pull requests page {d}...\n", .{page});
-        var raw = try github.@"pulls/listRaw"(
+        var raw = try github.pullsListRaw(
             &self.client,
             self.owner,
             self.repo_name,
@@ -399,7 +399,7 @@ pub const GitHubApiClient = struct {
 
     fn fetchIssuePage(self: *GitHubApiClient, page: u32) !PageResult(models.Issue) {
         std.debug.print("  Fetching closed issues page {d}...\n", .{page});
-        var raw = try github.@"issues/list-for-repoRaw"(
+        var raw = try github.issuesListForRepoRaw(
             &self.client,
             self.owner,
             self.repo_name,
