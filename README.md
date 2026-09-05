@@ -176,6 +176,10 @@ src/
   └── test.zig                # Integration tests
 ```
 
+## Credits
+
+The GitHub REST API client under `src/github/` is generated with [openapi2zig](https://github.com/christianhelle/openapi2zig). See [`src/github/README.md`](src/github/README.md) for instructions on how to regenerate it.
+
 ## License
 
 MIT
