@@ -3,6 +3,7 @@
 ## [Unreleased Changes]
 
 ### Features
+- Credit openapi2zig as the GitHub REST API client code generator ([#53](https://github.com/christianhelle/chlogr/pull/53)) ([@christianhelle](https://github.com/christianhelle/))
 - Use the generated OpenAPI client for GitHub API requests ([#52](https://github.com/christianhelle/chlogr/pull/52)) ([@christianhelle](https://github.com/christianhelle/))
 - Strip debug info from release binaries ([#51](https://github.com/christianhelle/chlogr/pull/51)) ([@christianhelle](https://github.com/christianhelle/))
 
