@@ -19,6 +19,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    addAppIcon(b, exe);
 
     b.installArtifact(exe);
 
@@ -75,10 +76,16 @@ pub fn build(b: *std.Build) void {
             .optimize = .ReleaseSmall,
         }),
     });
+    addAppIcon(b, release_exe);
 
     const install_release_step = b.step("install-release", "Build ReleaseSmall and install to ~/.local/bin (%USERPROFILE%/.local/bin on Windows)");
     const install_release = InstallReleaseStep.create(b, release_exe.getEmittedBin(), getInstallPrefix(b), release_exe.out_filename);
     install_release_step.dependOn(&install_release.step);
+}
+
+fn addAppIcon(b: *std.Build, exe: *std.Build.Step.Compile) void {
+    if (exe.rootModuleTarget().os.tag != .windows) return;
+    exe.root_module.addWin32ResourceFile(.{ .file = b.path("assets/chlogr.rc") });
 }
 
 fn getInstallPrefix(b: *std.Build) []const u8 {
