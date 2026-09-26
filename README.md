@@ -1,3 +1,6 @@
+[![Zig Version](https://img.shields.io/badge/zig-0.16.0%2B-orange.svg)](https://ziglang.org/download/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # Changelog Generator
 
 A fast, efficient, native CLI tool to automatically generate changelogs from GitHub tags, merged pull requests, and closed issues. Written in Zig
