@@ -28,3 +28,32 @@ jobs:
 
       - name: Test
         run: zig build test
+
+      - name: Smoke test install-release
+        shell: bash
+        run: |
+          set -euo pipefail
+          exe=chlogr
+          if [ "$RUNNER_OS" = "Windows" ]; then exe=chlogr.exe; fi
+          root="$RUNNER_TEMP/install-release"
+
+          check() {
+            test -f "$1/$exe" || { echo "missing $1/$exe"; exit 1; }
+            if [ "$RUNNER_OS" != "Windows" ]; then
+              test -x "$1/$exe" || { echo "$1/$exe is not executable"; exit 1; }
+            fi
+            "$1/$exe" --help > /dev/null 2>&1
+          }
+
+          # INSTALL_DIR is used verbatim and created when missing
+          INSTALL_DIR="$root/env/nested/bin" zig build install-release
+          check "$root/env/nested/bin"
+
+          # --prefix installs to <prefix>/bin and wins over INSTALL_DIR
+          INSTALL_DIR="$root/ignored" zig build install-release --prefix "$root/prefix"
+          check "$root/prefix/bin"
+          test ! -e "$root/ignored" || { echo "INSTALL_DIR was used despite --prefix"; exit 1; }
+
+          # Home directory default
+          INSTALL_DIR= HOME="$root/home" USERPROFILE="$root/home" zig build install-release
+          check "$root/home/.local/bin"
