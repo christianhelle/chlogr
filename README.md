@@ -1,4 +1,4 @@
-[![Zig Version](https://img.shields.io/badge/zig-0.16.0%2B-orange.svg)](https://ziglang.org/download/)
+[![Zig Version](https://img.shields.io/badge/zig-0.17.0%2B-orange.svg)](https://ziglang.org/download/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # Changelog Generator
@@ -36,7 +36,7 @@ The install scripts download the latest release binary from GitHub Releases. The
 
 ### Building from source
 
-Requirements: Zig 0.16+
+Requirements: Zig 0.17+
 
 ```bash
 zig build
