@@ -3,6 +3,12 @@
 ## [Unreleased Changes]
 
 ### Features
+- Upgrade to Zig 0.17.0 ([#56](https://github.com/christianhelle/chlogr/pull/56)) ([@christianhelle](https://github.com/christianhelle/))
+
+
+## [0.3.9](https://github.com/christianhelle/chlogr/releases/tag/0.3.9) (2026-10-12)
+
+### Features
 - Add application icon to Windows binary and Snap package ([#54](https://github.com/christianhelle/chlogr/pull/54)) ([@christianhelle](https://github.com/christianhelle/))
 - Credit openapi2zig as the GitHub REST API client code generator ([#53](https://github.com/christianhelle/chlogr/pull/53)) ([@christianhelle](https://github.com/christianhelle/))
 - Use the generated OpenAPI client for GitHub API requests ([#52](https://github.com/christianhelle/chlogr/pull/52)) ([@christianhelle](https://github.com/christianhelle/))
