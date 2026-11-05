@@ -4,12 +4,18 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const github = b.dependency("github", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("github");
+
     const exe = b.addExecutable(.{
         .name = "chlogr",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
+            .imports = &.{.{ .name = "github", .module = github }},
             // Zig only strips ReleaseSmall by default; strip release
             // builds so the released binaries don't embed DWARF debug info.
             .strip = switch (optimize) {
@@ -35,6 +41,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/test.zig"),
             .target = target,
             .optimize = optimize,
+            .imports = &.{.{ .name = "github", .module = github }},
         }),
     });
 
@@ -49,6 +56,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/github_api.zig"),
             .target = target,
             .optimize = optimize,
+            .imports = &.{.{ .name = "github", .module = github }},
         }),
     });
     const run_unit_tests = b.addRunArtifact(unit_tests);
@@ -71,6 +79,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = .ReleaseSmall,
+            .imports = &.{.{ .name = "github", .module = github }},
         }),
     });
     addAppIcon(b, release_exe);

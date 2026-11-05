@@ -1,5 +1,5 @@
 const std = @import("std");
-const github = @import("github/client.zig");
+const github = @import("github").client;
 const models = @import("models.zig");
 
 fn copyLabel(allocator: std.mem.Allocator, src: models.Label) !models.Label {

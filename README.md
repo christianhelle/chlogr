@@ -172,7 +172,6 @@ src/
   ├── token_resolver.zig      # GitHub token resolution
   ├── models.zig              # Data structures
   ├── github_api.zig          # GitHub API integration
-  ├── github/                 # Generated GitHub REST API client (openapi2zig)
   ├── changelog_generator.zig # Core changelog logic
   ├── markdown_formatter.zig  # Markdown output formatting
   ├── test_data.zig           # Mock test data
@@ -181,7 +180,7 @@ src/
 
 ## Credits
 
-The GitHub REST API client under `src/github/` is generated with [openapi2zig](https://github.com/christianhelle/openapi2zig). See [`src/github/README.md`](src/github/README.md) for instructions on how to regenerate it.
+GitHub REST API access uses [github-sdk-for-zig](https://github.com/christianhelle/github-sdk-for-zig), generated with [openapi2zig](https://github.com/christianhelle/openapi2zig).
 
 ## License
 

@@ -1,0 +1,20 @@
+.{
+    .name = .chlogr,
+    .version = "0.3.9",
+    .fingerprint = 0x302cc90d5f09f82d,
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{
+        .github = .{
+            .url = "git+https://github.com/christianhelle/github-sdk-for-zig?ref=v0.1.0#ebf1ec3f837cd4ce46e4931de806f3e7e858fd78",
+            .hash = "github-0.1.0-ZmTaJ3i-TQDNKelwFi23Nybf9d2HDx90TRXEsmQ6ZXVd",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "assets",
+        "LICENSE",
+        "README.md",
+    },
+}
