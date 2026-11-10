@@ -3,6 +3,7 @@
 ## [Unreleased Changes]
 
 ### Features
+- Upgrade to Zig 0.17.1 ([#59](https://github.com/christianhelle/chlogr/pull/59)) ([@christianhelle](https://github.com/christianhelle/))
 - Replace generated GitHub client with github-sdk-for-zig ([#58](https://github.com/christianhelle/chlogr/pull/58)) ([@christianhelle](https://github.com/christianhelle/))
 - Re-generate Github Client using openapi2zig v0.6.1 ([#57](https://github.com/christianhelle/chlogr/pull/57)) ([@christianhelle](https://github.com/christianhelle/))
 - Upgrade to Zig 0.17.0 ([#56](https://github.com/christianhelle/chlogr/pull/56)) ([@christianhelle](https://github.com/christianhelle/))
