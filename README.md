@@ -1,4 +1,4 @@
-[![Zig Version](https://img.shields.io/badge/zig-0.17.0%2B-orange.svg)](https://ziglang.org/download/)
+[![Zig Version](https://img.shields.io/badge/zig-0.17.1%2B-orange.svg)](https://ziglang.org/download/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # Changelog Generator
