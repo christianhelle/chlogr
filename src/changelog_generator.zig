@@ -127,6 +127,8 @@ pub const ChangelogGenerator = struct {
                 return "Features";
             } else if (std.mem.eql(u8, label.name, "bug") or std.mem.eql(u8, label.name, "bugfix")) {
                 return "Bug Fixes";
+            } else if (std.mem.eql(u8, label.name, "security") or std.mem.eql(u8, label.name, "vulnerability")) {
+                return "Security Vulnerabilities Fixes";
             }
         }
         return "Merged Pull Requests";
