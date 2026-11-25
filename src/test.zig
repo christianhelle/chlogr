@@ -86,9 +86,10 @@ fn testBasicChangelogGeneration() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 2);
@@ -121,9 +122,10 @@ fn testUnreleasedChangesOnly() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 1);
@@ -156,9 +158,10 @@ fn testNoUnreleasedChanges() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 1);
@@ -187,9 +190,10 @@ fn testExcludeLabels() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, "wontfix");
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 2);
@@ -231,9 +235,10 @@ fn testNoMergedAt() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 2);
@@ -262,9 +267,10 @@ fn testEmptyReleases() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 0);
@@ -293,9 +299,10 @@ fn testEmptyPullRequests() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 2);
@@ -324,9 +331,10 @@ fn testMarkdownFormatterWithUnreleased() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     var formatter = markdown_formatter.MarkdownFormatter.init(allocator, std.Io.Threaded.global_single_threaded.io(), "testowner/testrepo");
@@ -371,7 +379,7 @@ fn testExcludeLabelsAlsoAppliesToClosedIssues() !void {
     const issues = issues_parsed.value;
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, "wontfix");
-    const changelog = try gen.generateWithIssues(releases, prs, issues);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     var found_visible = false;
@@ -411,9 +419,10 @@ fn testMarkdownFormatterWithoutUnreleased() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     var formatter = markdown_formatter.MarkdownFormatter.init(allocator, std.Io.Threaded.global_single_threaded.io(), "testowner/testrepo");
@@ -442,7 +451,7 @@ fn testClosedIssuesGroupedByRelease() !void {
     const issues = issues_parsed.value;
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generateWithIssues(releases, &[_]models.PullRequest{}, issues);
+    const changelog = try gen.generate(releases, &[_]models.PullRequest{}, issues);
     defer gen.deinitChangelog(changelog);
 
     const v1_2_0 = findRelease(changelog.releases, "v1.2.0") orelse return error.MissingRelease;
@@ -489,7 +498,7 @@ fn testMarkdownFormatterIncludesClosedIssuesSection() !void {
     const issues = issues_parsed.value;
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generateWithIssues(releases, prs, issues);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     var formatter = markdown_formatter.MarkdownFormatter.init(allocator, std.Io.Threaded.global_single_threaded.io(), "testowner/testrepo");
@@ -521,7 +530,7 @@ fn testClosedIssuesExcludePullRequestEntries() !void {
     const issues = issues_parsed.value;
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generateWithIssues(releases, &[_]models.PullRequest{}, issues);
+    const changelog = try gen.generate(releases, &[_]models.PullRequest{}, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelogContainsEntry(changelog, 910));
@@ -551,9 +560,10 @@ fn testCategorization() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     for (changelog.releases) |release| {
@@ -615,9 +625,10 @@ fn testLegacyFormatMethod() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     var formatter = markdown_formatter.MarkdownFormatter.init(allocator, std.Io.Threaded.global_single_threaded.io(), "testowner/testrepo");
@@ -651,9 +662,10 @@ fn testSameDayMergeHandling() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 1);
@@ -692,11 +704,12 @@ fn testSinceTagFilter() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     // since_tag = v1.2.0 → includes v1.2.0, v1.1.0, v1.0.0; sorted newest-first in result
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
     gen.since_tag = "v1.2.0";
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 3);
@@ -728,9 +741,10 @@ fn testNoDuplicateAssignment() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     var total_count: usize = 0;
@@ -767,11 +781,12 @@ fn testUntilTagFilter() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     // until_tag = v1.2.0 → includes v1.3.0, v1.2.0; sorted newest-first in result
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
     gen.until_tag = "v1.2.0";
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 2);
@@ -801,12 +816,13 @@ fn testBothTagsFilter() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     // since_tag = v1.1.0, until_tag = v1.3.0 → includes v1.3.0, v1.2.0, v1.1.0; sorted newest-first
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
     gen.since_tag = "v1.1.0";
     gen.until_tag = "v1.3.0";
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     try std.testing.expect(changelog.releases.len == 3);
@@ -837,10 +853,11 @@ fn testExcludeLabelsExactMatch() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     // Only "bug" should be excluded; "bug-fix" and "debug" must survive.
     var gen = changelog_generator.ChangelogGenerator.init(allocator, "bug");
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     var found_bug: bool = false;
@@ -884,10 +901,11 @@ fn testExcludeLabelsCSV() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     // Both "bug" and "enhancement" are excluded; "feature" must survive.
     var gen = changelog_generator.ChangelogGenerator.init(allocator, "bug,enhancement");
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     var found_bug: bool = false;
@@ -929,17 +947,18 @@ fn testTagNotFound() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     // since_tag that doesn't exist → error.SinceTagNotFound
     var gen_since = changelog_generator.ChangelogGenerator.init(allocator, null);
     gen_since.since_tag = "v9.9.9";
-    const result_since = gen_since.generate(releases, prs);
+    const result_since = gen_since.generate(releases, prs, issues);
     try std.testing.expectError(error.SinceTagNotFound, result_since);
 
     // until_tag that doesn't exist → error.UntilTagNotFound
     var gen_until = changelog_generator.ChangelogGenerator.init(allocator, null);
     gen_until.until_tag = "v9.9.9";
-    const result_until = gen_until.generate(releases, prs);
+    const result_until = gen_until.generate(releases, prs, issues);
     try std.testing.expectError(error.UntilTagNotFound, result_until);
 }
 
@@ -965,9 +984,10 @@ fn testRepoSlugInReleaseLinks() !void {
     );
     defer prs_parsed.deinit();
     const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
 
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     const repo_slug = "myorg/myrepo";
@@ -979,6 +999,50 @@ fn testRepoSlugInReleaseLinks() !void {
     try std.testing.expect(std.mem.indexOf(u8, markdown, "https://github.com/myorg/myrepo/releases/tag/") != null);
     // Hardcoded placeholder must not appear in release header links
     try std.testing.expect(std.mem.indexOf(u8, markdown, "https://github.com/owner/repo/releases/tag/") == null);
+}
+
+// Regression: PRs labelled "security" or "vulnerability" must land in the
+// "Security Vulnerability Fixes" section, while "bug" labels stay in "Bug Fixes".
+fn testSecurityVulnerabilityCategorization() !void {
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Reuse the two-release fixture; all test PRs merge before v1.1.0 (2024-01-10).
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_prs_security_labels,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
+
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    const changelog = try gen.generate(releases, prs, issues);
+    defer gen.deinitChangelog(changelog);
+
+    const v1_1_0 = findRelease(changelog.releases, "v1.1.0") orelse return error.MissingRelease;
+    const security = findSection(v1_1_0.sections, "Security Vulnerability Fixes") orelse
+        return error.MissingSecuritySection;
+
+    try std.testing.expect(sectionContainsEntry(security.*, 900));
+    try std.testing.expect(sectionContainsEntry(security.*, 901));
+    try std.testing.expect(!sectionContainsEntry(security.*, 902));
+
+    const bug_fixes = findSection(v1_1_0.sections, "Bug Fixes") orelse return error.MissingBugFixesSection;
+    try std.testing.expect(sectionContainsEntry(bug_fixes.*, 902));
+    try std.testing.expect(!sectionContainsEntry(bug_fixes.*, 900));
 }
 
 pub fn main() !void {
@@ -1080,6 +1144,10 @@ pub fn main() !void {
     try testRepoSlugInReleaseLinks();
     std.debug.print("  PASSED\n", .{});
 
+    std.debug.print("Running testSecurityVulnerabilityCategorization...\n", .{});
+    try testSecurityVulnerabilityCategorization();
+    std.debug.print("  PASSED\n", .{});
+
     std.debug.print("\n=== Integration Test with Output ===\n\n", .{});
 
     var gpa: std.heap.DebugAllocator(.{}) = .init;
@@ -1134,7 +1202,7 @@ pub fn main() !void {
 
     std.debug.print("\nGenerating changelog...\n", .{});
     var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generateWithIssues(releases, prs, issues);
+    const changelog = try gen.generate(releases, prs, issues);
     defer gen.deinitChangelog(changelog);
 
     std.debug.print("Generated {d} releases in changelog\n", .{changelog.releases.len});

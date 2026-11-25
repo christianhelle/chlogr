@@ -33,6 +33,7 @@ const section_order = [_][]const u8{
     "Merged Pull Requests",
     "Features",
     "Bug Fixes",
+    "Security Vulnerability Fixes",
     closed_issues_section_name,
 };
 
@@ -125,6 +126,8 @@ pub const ChangelogGenerator = struct {
         for (labels) |label| {
             if (std.mem.eql(u8, label.name, "feature") or std.mem.eql(u8, label.name, "enhancement")) {
                 return "Features";
+            } else if (std.mem.eql(u8, label.name, "security") or std.mem.eql(u8, label.name, "vulnerability")) {
+                return "Security Vulnerability Fixes";
             } else if (std.mem.eql(u8, label.name, "bug") or std.mem.eql(u8, label.name, "bugfix")) {
                 return "Bug Fixes";
             }
@@ -181,22 +184,10 @@ pub const ChangelogGenerator = struct {
         return self.shouldExclude(issue.labels) or issue.pull_request != null;
     }
 
-    /// Generate changelog from releases and PRs.
-    /// Each PR is assigned to exactly one release: the earliest release whose
-    /// published_at >= pr.merged_at (full ISO 8601 lexicographic comparison).
-    /// PRs with no qualifying release go to unreleased.
-    pub fn generate(
-        self: ChangelogGenerator,
-        releases: []models.Release,
-        prs: []models.PullRequest,
-    ) !Changelog {
-        return self.generateWithIssues(releases, prs, &[_]models.Issue{});
-    }
-
     /// Generate changelog from releases, pull requests, and closed issues.
     /// Issues are assigned to the earliest release whose published_at >= issue.closed_at.
     /// Issues without a qualifying release are omitted so unreleased output remains PR-only.
-    pub fn generateWithIssues(
+    pub fn generate(
         self: ChangelogGenerator,
         releases: []models.Release,
         prs: []models.PullRequest,
