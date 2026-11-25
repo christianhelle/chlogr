@@ -9,7 +9,7 @@ A fast, efficient, native CLI tool to automatically generate changelogs from Git
 
 - Fast, compiled binary (zero dependencies, pure Zig stdlib)
 - Generates Markdown changelogs automatically
-- Groups merged pull requests by labels (Features, Bug Fixes, Merged Pull Requests)
+- Groups merged pull requests by labels (Features, Bug Fixes, Security Vulnerability Fixes, Merged Pull Requests)
 - Adds a Closed Issues section under each release based on issue close timestamps
 - Links to PRs, issues, and contributors
 - Smart token resolution (--token flag → env vars → `gh auth token` CLI)

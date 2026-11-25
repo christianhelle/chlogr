@@ -578,6 +578,43 @@ pub const test_prs_csv_labels =
     \\]
 ;
 
+// Security categorization test data.
+// PR #900 has label "security" and PR #901 has label "vulnerability" → both must land
+// in the "Security Vulnerability Fixes" section.
+// PR #902 has label "bug" → must stay in "Bug Fixes".
+// All merged before v1.1.0 (2024-01-10) so they land in a release.
+pub const test_prs_security_labels =
+    \\[
+    \\  {
+    \\    "number": 900,
+    \\    "title": "Patch security issue",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/900",
+    \\    "user": { "login": "alice", "html_url": "https://github.com/alice" },
+    \\    "labels": [{ "name": "security", "color": "b60205" }],
+    \\    "merged_at": "2024-01-09T10:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 901,
+    \\    "title": "Patch known vulnerability",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/901",
+    \\    "user": { "login": "bob", "html_url": "https://github.com/bob" },
+    \\    "labels": [{ "name": "vulnerability", "color": "b60205" }],
+    \\    "merged_at": "2024-01-09T11:00:00Z"
+    \\  },
+    \\  {
+    \\    "number": 902,
+    \\    "title": "Regular bug fix",
+    \\    "body": null,
+    \\    "html_url": "https://github.com/owner/repo/pull/902",
+    \\    "user": { "login": "charlie", "html_url": "https://github.com/charlie" },
+    \\    "labels": [{ "name": "bug", "color": "d73a4a" }],
+    \\    "merged_at": "2024-01-09T12:00:00Z"
+    \\  }
+    \\]
+;
+
 pub const test_prs_for_four_versions =
     \\[
     \\  {

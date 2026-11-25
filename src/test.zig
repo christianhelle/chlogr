@@ -1001,6 +1001,50 @@ fn testRepoSlugInReleaseLinks() !void {
     try std.testing.expect(std.mem.indexOf(u8, markdown, "https://github.com/owner/repo/releases/tag/") == null);
 }
 
+// Regression: PRs labelled "security" or "vulnerability" must land in the
+// "Security Vulnerability Fixes" section, while "bug" labels stay in "Bug Fixes".
+fn testSecurityVulnerabilityCategorization() !void {
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Reuse the two-release fixture; all test PRs merge before v1.1.0 (2024-01-10).
+    var releases_parsed = try std.json.parseFromSlice(
+        []models.Release,
+        allocator,
+        test_data.test_releases,
+        .{},
+    );
+    defer releases_parsed.deinit();
+    const releases = releases_parsed.value;
+
+    var prs_parsed = try std.json.parseFromSlice(
+        []models.PullRequest,
+        allocator,
+        test_data.test_prs_security_labels,
+        .{},
+    );
+    defer prs_parsed.deinit();
+    const prs = prs_parsed.value;
+    const issues = &[_]models.Issue{};
+
+    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
+    const changelog = try gen.generate(releases, prs, issues);
+    defer gen.deinitChangelog(changelog);
+
+    const v1_1_0 = findRelease(changelog.releases, "v1.1.0") orelse return error.MissingRelease;
+    const security = findSection(v1_1_0.sections, "Security Vulnerability Fixes") orelse
+        return error.MissingSecuritySection;
+
+    try std.testing.expect(sectionContainsEntry(security.*, 900));
+    try std.testing.expect(sectionContainsEntry(security.*, 901));
+    try std.testing.expect(!sectionContainsEntry(security.*, 902));
+
+    const bug_fixes = findSection(v1_1_0.sections, "Bug Fixes") orelse return error.MissingBugFixesSection;
+    try std.testing.expect(sectionContainsEntry(bug_fixes.*, 902));
+    try std.testing.expect(!sectionContainsEntry(bug_fixes.*, 900));
+}
+
 pub fn main() !void {
     std.debug.print("=== Changelog Generator Integration Test ===\n\n", .{});
 
@@ -1098,6 +1142,10 @@ pub fn main() !void {
 
     std.debug.print("Running testRepoSlugInReleaseLinks...\n", .{});
     try testRepoSlugInReleaseLinks();
+    std.debug.print("  PASSED\n", .{});
+
+    std.debug.print("Running testSecurityVulnerabilityCategorization...\n", .{});
+    try testSecurityVulnerabilityCategorization();
     std.debug.print("  PASSED\n", .{});
 
     std.debug.print("\n=== Integration Test with Output ===\n\n", .{});
