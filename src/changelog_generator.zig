@@ -33,6 +33,7 @@ const section_order = [_][]const u8{
     "Merged Pull Requests",
     "Features",
     "Bug Fixes",
+    "Security Vulnerability Fixes",
     closed_issues_section_name,
 };
 
@@ -125,10 +126,10 @@ pub const ChangelogGenerator = struct {
         for (labels) |label| {
             if (std.mem.eql(u8, label.name, "feature") or std.mem.eql(u8, label.name, "enhancement")) {
                 return "Features";
+            } else if (std.mem.eql(u8, label.name, "security") or std.mem.eql(u8, label.name, "vulnerability")) {
+                return "Security Vulnerability Fixes";
             } else if (std.mem.eql(u8, label.name, "bug") or std.mem.eql(u8, label.name, "bugfix")) {
                 return "Bug Fixes";
-            } else if (std.mem.eql(u8, label.name, "security") or std.mem.eql(u8, label.name, "vulnerability")) {
-                return "Security Vulnerabilities Fixes";
             }
         }
         return "Merged Pull Requests";
