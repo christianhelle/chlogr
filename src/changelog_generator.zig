@@ -181,22 +181,10 @@ pub const ChangelogGenerator = struct {
         return self.shouldExclude(issue.labels) or issue.pull_request != null;
     }
 
-    /// Generate changelog from releases and PRs.
-    /// Each PR is assigned to exactly one release: the earliest release whose
-    /// published_at >= pr.merged_at (full ISO 8601 lexicographic comparison).
-    /// PRs with no qualifying release go to unreleased.
-    pub fn generate(
-        self: ChangelogGenerator,
-        releases: []models.Release,
-        prs: []models.PullRequest,
-    ) !Changelog {
-        return self.generateWithIssues(releases, prs, &[_]models.Issue{});
-    }
-
     /// Generate changelog from releases, pull requests, and closed issues.
     /// Issues are assigned to the earliest release whose published_at >= issue.closed_at.
     /// Issues without a qualifying release are omitted so unreleased output remains PR-only.
-    pub fn generateWithIssues(
+    pub fn generate(
         self: ChangelogGenerator,
         releases: []models.Release,
         prs: []models.PullRequest,

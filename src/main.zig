@@ -124,7 +124,7 @@ pub fn main(init: std.process.Init) !void {
     );
     gen.since_tag = parsed_args.since_tag;
     gen.until_tag = parsed_args.until_tag;
-    const changelog = gen.generateWithIssues(
+    const changelog = gen.generate(
         fetched.releases,
         fetched.prs,
         fetched.issues,
