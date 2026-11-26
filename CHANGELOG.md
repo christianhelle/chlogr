@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased Changes]
+## [0.4.10](https://github.com/christianhelle/chlogr/releases/tag/0.4.10) (2026-11-25)
 
 ### Features
 - Add security vulnerability fixes section to changelog output ([#60](https://github.com/christianhelle/chlogr/pull/60)) ([@christianhelle](https://github.com/christianhelle/))
