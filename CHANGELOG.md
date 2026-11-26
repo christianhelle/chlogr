@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased Changes]
+
+### Features
+- Convert integration test runner to test declarations ([#61](https://github.com/christianhelle/chlogr/pull/61)) ([@christianhelle](https://github.com/christianhelle/))
+
+
 ## [0.4.10](https://github.com/christianhelle/chlogr/releases/tag/0.4.10) (2026-11-25)
 
 ### Features
