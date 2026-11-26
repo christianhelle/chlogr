@@ -64,7 +64,7 @@ fn changelogContainsEntry(
     return false;
 }
 
-fn testBasicChangelogGeneration() !void {
+test "basic changelog generation groups releases and reports unreleased" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -100,7 +100,7 @@ fn testBasicChangelogGeneration() !void {
     }
 }
 
-fn testUnreleasedChangesOnly() !void {
+test "unreleased-only run keeps releases and reports unreleased" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -136,7 +136,7 @@ fn testUnreleasedChangesOnly() !void {
     }
 }
 
-fn testNoUnreleasedChanges() !void {
+test "no unreleased section when every pr merges before a release" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -168,7 +168,7 @@ fn testNoUnreleasedChanges() !void {
     try std.testing.expect(changelog.unreleased == null);
 }
 
-fn testExcludeLabels() !void {
+test "exclude-labels removes matching pull requests" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -213,7 +213,7 @@ fn testExcludeLabels() !void {
     try std.testing.expect(!found_excluded);
 }
 
-fn testNoMergedAt() !void {
+test "pull requests without merged at are ignored" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -245,7 +245,7 @@ fn testNoMergedAt() !void {
     try std.testing.expect(changelog.unreleased == null);
 }
 
-fn testEmptyReleases() !void {
+test "empty releases yields unreleased changes only" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -277,7 +277,7 @@ fn testEmptyReleases() !void {
     try std.testing.expect(changelog.unreleased != null);
 }
 
-fn testEmptyPullRequests() !void {
+test "empty pull requests yields no unreleased section" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -309,7 +309,7 @@ fn testEmptyPullRequests() !void {
     try std.testing.expect(changelog.unreleased == null);
 }
 
-fn testMarkdownFormatterWithUnreleased() !void {
+test "markdown includes unreleased changes" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -346,7 +346,7 @@ fn testMarkdownFormatterWithUnreleased() !void {
     try std.testing.expect(std.mem.indexOf(u8, markdown, "Unreleased bug fix") != null);
 }
 
-fn testExcludeLabelsAlsoAppliesToClosedIssues() !void {
+test "exclude-labels applies to closed issues" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -397,7 +397,7 @@ fn testExcludeLabelsAlsoAppliesToClosedIssues() !void {
     try std.testing.expect(!found_hidden);
 }
 
-fn testMarkdownFormatterWithoutUnreleased() !void {
+test "markdown omits unreleased heading when there are none" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -432,7 +432,7 @@ fn testMarkdownFormatterWithoutUnreleased() !void {
     try std.testing.expect(std.mem.indexOf(u8, markdown, "Unreleased Changes") == null);
 }
 
-fn testClosedIssuesGroupedByRelease() !void {
+test "closed issues attach to the earliest release after closing" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -470,7 +470,7 @@ fn testClosedIssuesGroupedByRelease() !void {
     try std.testing.expect(!changelogContainsEntry(changelog, 912));
 }
 
-fn testMarkdownFormatterIncludesClosedIssuesSection() !void {
+test "markdown includes the closed issues section" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -511,7 +511,7 @@ fn testMarkdownFormatterIncludesClosedIssuesSection() !void {
     try std.testing.expect(std.mem.indexOf(u8, markdown, "Close unreleased issue") == null);
 }
 
-fn testClosedIssuesExcludePullRequestEntries() !void {
+test "closed issues skip entries carrying a pull request marker" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -538,7 +538,7 @@ fn testClosedIssuesExcludePullRequestEntries() !void {
     try std.testing.expect(!changelogContainsEntry(changelog, 911));
 }
 
-fn testCategorization() !void {
+test "label categorization picks features bug fixes and default" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -603,7 +603,7 @@ fn testCategorization() !void {
     }
 }
 
-fn testLegacyFormatMethod() !void {
+test "legacy format entry point still renders" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -640,7 +640,7 @@ fn testLegacyFormatMethod() !void {
 
 // Regression: a PR whose merged_at equals the release's published_at must appear in
 // that release (boundary is inclusive), not in unreleased.
-fn testSameDayMergeHandling() !void {
+test "same-day merge belongs to that release" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -682,7 +682,7 @@ fn testSameDayMergeHandling() !void {
     try std.testing.expect(found_pr);
 }
 
-fn testSinceTagFilter() !void {
+test "since-tag keeps releases from that tag onward" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -719,7 +719,7 @@ fn testSinceTagFilter() !void {
 
 // Regression: a PR that qualifies for multiple releases must appear in exactly one
 // (the earliest qualifying release), never duplicated.
-fn testNoDuplicateAssignment() !void {
+test "a pull request appears in exactly one release" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -759,7 +759,7 @@ fn testNoDuplicateAssignment() !void {
     try std.testing.expect(changelog.unreleased == null);
 }
 
-fn testUntilTagFilter() !void {
+test "until-tag keeps releases up to that tag" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -794,7 +794,7 @@ fn testUntilTagFilter() !void {
     try std.testing.expectEqualStrings("v1.2.0", changelog.releases[1].version);
 }
 
-fn testBothTagsFilter() !void {
+test "both tags bound the release range" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -830,7 +830,7 @@ fn testBothTagsFilter() !void {
     try std.testing.expectEqualStrings("v1.1.0", changelog.releases[2].version);
 }
 
-fn testExcludeLabelsExactMatch() !void {
+test "exclude-labels matches label names exactly" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -879,7 +879,7 @@ fn testExcludeLabelsExactMatch() !void {
     try std.testing.expect(found_debug);
 }
 
-fn testExcludeLabelsCSV() !void {
+test "exclude-labels accepts a comma separated list" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -925,7 +925,7 @@ fn testExcludeLabelsCSV() !void {
     try std.testing.expect(found_feature);
 }
 
-fn testTagNotFound() !void {
+test "unknown tag reports a not-found error" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -962,7 +962,7 @@ fn testTagNotFound() !void {
     try std.testing.expectError(error.UntilTagNotFound, result_until);
 }
 
-fn testRepoSlugInReleaseLinks() !void {
+test "release links use the configured repo slug" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -1003,7 +1003,7 @@ fn testRepoSlugInReleaseLinks() !void {
 
 // Regression: PRs labelled "security" or "vulnerability" must land in the
 // "Security Vulnerability Fixes" section, while "bug" labels stay in "Bug Fixes".
-fn testSecurityVulnerabilityCategorization() !void {
+test "security and vulnerability labels get their own section" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -1045,196 +1045,38 @@ fn testSecurityVulnerabilityCategorization() !void {
     try std.testing.expect(!sectionContainsEntry(bug_fixes.*, 900));
 }
 
-pub fn main() !void {
-    std.debug.print("=== Changelog Generator Integration Test ===\n\n", .{});
+test "writeToFile appends the generated-by footer" {
+    const io = std.testing.io;
+    const allocator = std.testing.allocator;
 
-    std.debug.print("Running testBasicChangelogGeneration...\n", .{});
-    try testBasicChangelogGeneration();
-    std.debug.print("  PASSED\n", .{});
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
 
-    std.debug.print("Running testUnreleasedChangesOnly...\n", .{});
-    try testUnreleasedChangesOnly();
-    std.debug.print("  PASSED\n", .{});
+    var entries = [_]changelog_generator.ChangelogEntry{
+        .{ .title = "Ship it", .url = "https://example.test/1", .author = "alice", .number = 1 },
+    };
+    var sections = [_]changelog_generator.ChangelogSection{
+        .{ .name = "Features", .entries = &entries },
+    };
+    var releases = [_]changelog_generator.ChangelogRelease{
+        .{ .version = "v1.0.0", .date = "2024-01-01T00:00:00Z", .sections = &sections },
+    };
 
-    std.debug.print("Running testNoUnreleasedChanges...\n", .{});
-    try testNoUnreleasedChanges();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testExcludeLabels...\n", .{});
-    try testExcludeLabels();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testNoMergedAt...\n", .{});
-    try testNoMergedAt();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testEmptyReleases...\n", .{});
-    try testEmptyReleases();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testEmptyPullRequests...\n", .{});
-    try testEmptyPullRequests();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testMarkdownFormatterWithUnreleased...\n", .{});
-    try testMarkdownFormatterWithUnreleased();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testMarkdownFormatterWithoutUnreleased...\n", .{});
-    try testMarkdownFormatterWithoutUnreleased();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testClosedIssuesGroupedByRelease...\n", .{});
-    try testClosedIssuesGroupedByRelease();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testMarkdownFormatterIncludesClosedIssuesSection...\n", .{});
-    try testMarkdownFormatterIncludesClosedIssuesSection();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testClosedIssuesExcludePullRequestEntries...\n", .{});
-    try testClosedIssuesExcludePullRequestEntries();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testExcludeLabelsAlsoAppliesToClosedIssues...\n", .{});
-    try testExcludeLabelsAlsoAppliesToClosedIssues();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testCategorization...\n", .{});
-    try testCategorization();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testLegacyFormatMethod...\n", .{});
-    try testLegacyFormatMethod();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testSameDayMergeHandling...\n", .{});
-    try testSameDayMergeHandling();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testNoDuplicateAssignment...\n", .{});
-    try testNoDuplicateAssignment();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testSinceTagFilter...\n", .{});
-    try testSinceTagFilter();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testUntilTagFilter...\n", .{});
-    try testUntilTagFilter();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testBothTagsFilter...\n", .{});
-    try testBothTagsFilter();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testTagNotFound...\n", .{});
-    try testTagNotFound();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testExcludeLabelsExactMatch...\n", .{});
-    try testExcludeLabelsExactMatch();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testExcludeLabelsCSV...\n", .{});
-    try testExcludeLabelsCSV();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testRepoSlugInReleaseLinks...\n", .{});
-    try testRepoSlugInReleaseLinks();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("Running testSecurityVulnerabilityCategorization...\n", .{});
-    try testSecurityVulnerabilityCategorization();
-    std.debug.print("  PASSED\n", .{});
-
-    std.debug.print("\n=== Integration Test with Output ===\n\n", .{});
-
-    var gpa: std.heap.DebugAllocator(.{}) = .init;
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    std.debug.print("Parsing mock releases...\n", .{});
-    var releases_parsed = try std.json.parseFromSlice(
-        []models.Release,
-        allocator,
-        test_data.test_releases,
-        .{},
-    );
-    defer releases_parsed.deinit();
-    const releases = releases_parsed.value;
-
-    std.debug.print("Found {d} releases\n", .{releases.len});
-    for (releases) |release| {
-        std.debug.print("  - {s} ({s})\n", .{ release.tag_name.?, release.published_at.? });
-    }
-
-    std.debug.print("\nParsing mock pull requests...\n", .{});
-    var prs_parsed = try std.json.parseFromSlice(
-        []models.PullRequest,
-        allocator,
-        test_data.test_pull_requests,
-        .{},
-    );
-    defer prs_parsed.deinit();
-    const prs = prs_parsed.value;
-
-    std.debug.print("Found {d} pull requests\n", .{prs.len});
-    for (prs) |pr| {
-        std.debug.print("  - #{d}: {s} by @{s}\n", .{ pr.number, pr.title, pr.user.login });
-        for (pr.labels) |label| {
-            std.debug.print("      Label: {s}\n", .{label.name});
-        }
-    }
-
-    std.debug.print("\nParsing mock closed issues...\n", .{});
-    var issues_parsed = try parseIssues(allocator, test_data.test_closed_issues);
-    defer issues_parsed.deinit();
-    const issues = issues_parsed.value;
-
-    std.debug.print("Found {d} closed issues\n", .{issues.len});
-    for (issues) |issue| {
-        std.debug.print("  - #{d}: {s} by @{s}\n", .{ issue.number, issue.title, issue.user.login });
-        for (issue.labels) |label| {
-            std.debug.print("      Label: {s}\n", .{label.name});
-        }
-    }
-
-    std.debug.print("\nGenerating changelog...\n", .{});
-    var gen = changelog_generator.ChangelogGenerator.init(allocator, null);
-    const changelog = try gen.generate(releases, prs, issues);
-    defer gen.deinitChangelog(changelog);
-
-    std.debug.print("Generated {d} releases in changelog\n", .{changelog.releases.len});
-    for (changelog.releases) |rel| {
-        std.debug.print("  Release {s}: {d} sections\n", .{ rel.version, rel.sections.len });
-        for (rel.sections) |sec| {
-            std.debug.print("    - {s}: {d} entries\n", .{ sec.name, sec.entries.len });
-        }
-    }
-
-    if (changelog.unreleased) |un| {
-        std.debug.print("Unreleased changes: {d} sections\n", .{un.sections.len});
-        for (un.sections) |sec| {
-            std.debug.print("    - {s}: {d} entries\n", .{ sec.name, sec.entries.len });
-        }
-    }
-
-    std.debug.print("\nFormatting to Markdown...\n", .{});
-    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, std.Io.Threaded.global_single_threaded.io(), "testowner/testrepo");
-    const markdown = try formatter.formatWithUnreleased(changelog.releases, changelog.unreleased);
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, io, "testowner/testrepo");
+    const markdown = try formatter.formatWithUnreleased(&releases, null);
     defer formatter.deinit(markdown);
 
-    const output_path = "CHANGELOG_TEST.md";
+    const output_path = try std.fs.path.join(allocator, &.{ ".zig-cache/tmp", &tmp.sub_path, "CHANGELOG.md" });
+    defer allocator.free(output_path);
+
     try formatter.writeToFile(output_path, markdown);
-    std.debug.print("Wrote changelog to {s}\n\n", .{output_path});
 
-    std.debug.print("=== Sample Output (first 700 chars) ===\n", .{});
-    const sample_len = @min(700, markdown.len);
-    std.debug.print("{s}\n", .{markdown[0..sample_len]});
-    if (markdown.len > sample_len) {
-        std.debug.print("... (truncated, total {d} bytes)\n", .{markdown.len});
-    }
+    const written = try tmp.dir.readFileAlloc(io, "CHANGELOG.md", allocator, .limited(8192));
+    defer allocator.free(written);
 
-    std.debug.print("\n✅ Integration test completed successfully!\n", .{});
+    try std.testing.expect(std.mem.indexOf(u8, written, "## [v1.0.0]") != null);
+    try std.testing.expect(std.mem.indexOf(u8, written, "Ship it") != null);
+    try std.testing.expect(std.mem.indexOf(u8, written, "---\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, written, "generated with [chlogr]") != null);
+    try std.testing.expect(std.mem.indexOf(u8, written, "will be overwritten") != null);
 }

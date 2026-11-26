@@ -16,7 +16,7 @@ A fast, efficient, native CLI tool to automatically generate changelogs from Git
 - Works with any GitHub repository
 - Progress output during fetch — per-section headers and page counters keep you informed on large repos
 - Optional parallel fetching (`--parallel <N>`) — fetches releases, PRs, and closed issues concurrently; pagination uses bounded page concurrency
-- Fully functional core logic verified with integration tests
+- Fully functional core logic covered by unit tests with fixture data
 
 ## Installation
 
@@ -155,7 +155,7 @@ If none are available, the tool will display a helpful error message.
 zig build test
 ```
 
-This runs integration tests with mock GitHub data to verify:
+This runs the unit test suite against fixture data to verify:
 
 - CLI argument parsing (--parallel and all existing flags)
 - JSON parsing of releases, PRs, and closed issues
@@ -175,7 +175,7 @@ src/
   ├── changelog_generator.zig # Core changelog logic
   ├── markdown_formatter.zig  # Markdown output formatting
   ├── test_data.zig           # Mock test data
-  └── test.zig                # Integration tests
+  └── test.zig                # Changelog generation and formatting tests
 ```
 
 ## Credits
