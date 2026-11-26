@@ -1044,3 +1044,39 @@ test "security and vulnerability labels get their own section" {
     try std.testing.expect(sectionContainsEntry(bug_fixes.*, 902));
     try std.testing.expect(!sectionContainsEntry(bug_fixes.*, 900));
 }
+
+test "writeToFile appends the generated-by footer" {
+    const io = std.testing.io;
+    const allocator = std.testing.allocator;
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    var entries = [_]changelog_generator.ChangelogEntry{
+        .{ .title = "Ship it", .url = "https://example.test/1", .author = "alice", .number = 1 },
+    };
+    var sections = [_]changelog_generator.ChangelogSection{
+        .{ .name = "Features", .entries = &entries },
+    };
+    var releases = [_]changelog_generator.ChangelogRelease{
+        .{ .version = "v1.0.0", .date = "2024-01-01T00:00:00Z", .sections = &sections },
+    };
+
+    var formatter = markdown_formatter.MarkdownFormatter.init(allocator, io, "testowner/testrepo");
+    const markdown = try formatter.formatWithUnreleased(&releases, null);
+    defer formatter.deinit(markdown);
+
+    const output_path = try std.fs.path.join(allocator, &.{ ".zig-cache/tmp", &tmp.sub_path, "CHANGELOG.md" });
+    defer allocator.free(output_path);
+
+    try formatter.writeToFile(output_path, markdown);
+
+    const written = try tmp.dir.readFileAlloc(io, "CHANGELOG.md", allocator, .limited(8192));
+    defer allocator.free(written);
+
+    try std.testing.expect(std.mem.indexOf(u8, written, "## [v1.0.0]") != null);
+    try std.testing.expect(std.mem.indexOf(u8, written, "Ship it") != null);
+    try std.testing.expect(std.mem.indexOf(u8, written, "---\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, written, "generated with [chlogr]") != null);
+    try std.testing.expect(std.mem.indexOf(u8, written, "will be overwritten") != null);
+}
